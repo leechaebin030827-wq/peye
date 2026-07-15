@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>P.eye Bubble Sorter - AI & Human</title>
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- p5.js 라이브러리 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
+  
+  <!-- Matter.js 물리 엔진 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+
+  <!-- MediaPipe Hand Tracking -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="status-indicator">DEBUG: Spacebar = Drop Bubble</div>
+  
+  <button id="serial-btn" onclick="initSerialConnection()">CONNECT ARDUINO</button>
+  
+  <!-- MediaPipe를 위한 숨김 비디오 스트림 -->
+  <video id="webcam" autoplay muted playsinline style="position: absolute; width: 1px; height: 1px; opacity: 0.01; pointer-events: none;"></video>
+
+  <div id="canvas-container">
+    <!-- p5.js 캔버스가 여기에 생성됩니다 -->
+  </div>
+
+  <script src="sketch.js?v=23"></script>
+</body>
+</html>

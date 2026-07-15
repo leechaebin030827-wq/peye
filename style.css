@@ -1,0 +1,118 @@
+/* p5.js + Matter.js 전시용 프리미엄 스타일링 */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;700&display=swap');
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+body {
+  background-color: #060709;
+  color: #ffffff;
+  font-family: 'Outfit', sans-serif;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* 화면 비율을 유지하고 뷰포트에 맞추기 위한 캔버스 컨테이너 */
+#canvas-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+canvas {
+  max-width: 100%;
+  max-height: 100vh;
+  object-fit: contain;
+  aspect-ratio: 2160 / 3840;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 100px rgba(0, 230, 255, 0.05);
+  border-radius: 8px;
+  background-color: #121318;
+}
+
+/* 글래스모피즘 아두이노 연결 버튼 */
+#serial-btn {
+  position: fixed;
+  top: 30px;
+  right: 30px;
+  padding: 14px 28px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(18, 19, 24, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50px;
+  cursor: pointer;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+}
+
+#serial-btn::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #ff3b30; /* 초기 상태: 빨간색 (연결 안 됨) */
+  box-shadow: 0 0 8px #ff3b30;
+  transition: all 0.3s ease;
+}
+
+#serial-btn.connected::before {
+  background-color: #34c759; /* 연결 완료 상태: 초록색 */
+  box-shadow: 0 0 12px #34c759;
+}
+
+#serial-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 15px rgba(255, 255, 255, 0.1);
+}
+
+#serial-btn:active {
+  transform: translateY(1px);
+}
+
+/* 빠른 디버깅용 상태 표시 오버레이 */
+#status-indicator {
+  position: fixed;
+  top: 30px;
+  left: 30px;
+  font-size: 14px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.4);
+  background: rgba(0, 0, 0, 0.4);
+  padding: 6px 12px;
+  border-radius: 4px;
+  pointer-events: none;
+  font-family: monospace;
+  z-index: 100;
+}
+
+@font-face {
+    font-family: 'DNFBitBitv2';
+    font-style: normal;
+    font-weight: 400;
+    src: url('https://cdn.df.nexon.com/img/common/font/DNFBitBitv2.otf') format('opentype');
+}

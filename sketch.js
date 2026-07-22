@@ -984,6 +984,13 @@ function keyPressed() {
     if (key === 'p' || key === 'P') {
         skipToFinished();
     }
+
+    // 바로 2부(인간 버블 화면)로 넘어가는 'O' 키 단축키 처리
+    if (key === 'o' || key === 'O') {
+        transitionToSecondScreen();
+        currentAppState = APP_STATE.SECOND_SCREEN;
+        secondScreenStartTime = millis();
+    }
 }
 
 /**
@@ -1112,6 +1119,7 @@ function skipToFinished() {
             body: body,
             text: item.text,
             type: item.type,
+            reason: item.reason,
             radius: radius,
             wobbleOffset: random(0, 1000),
             wobbleAmp: 0.0
@@ -1691,11 +1699,15 @@ function initializeHandTracking() {
                 });
                 let avgDist = distSum / 4;
                 let isFist = avgDist < FIST_THRESHOLD;
+                
+                // 손을 쥘수록 (avgDist가 작을수록) 1.0에 가까워지고, 펼수록 (avgDist가 클수록) 0.0에 가까워짐
+                let clenchFactor = map(avgDist, 0.22, 0.05, 0.0, 1.0, true);
 
                 trackedHands.push({
                     x: mappedCenter.x,
                     y: mappedCenter.y,
                     isFist: isFist,
+                    clenchFactor: clenchFactor,
                     landmarks: landmarks
                 });
             }
@@ -1784,17 +1796,31 @@ function handleFadeTransition() {
 }
 
 function createPopParticles(x, y) {
-    const count = 12;
+    const count = 60; // 파사삭 터지는 풍부한 효과를 위해 파티클 수 증가
     for (let i = 0; i < count; i++) {
-        const angle = (TWO_PI / count) * i;
-        const speed = random(5, 10);
+        // 버블 반경(200px)에 맞추어 버블 전 영역에 고르게 파티클 생성
+        let r = random(0, 180);
+        let theta = random(TWO_PI);
+        let px = x + cos(theta) * r;
+        let py = y + sin(theta) * r;
+
+        // 버블 중심으로부터 외곽으로 퍼져나가는 벡터 계산
+        let angle = atan2(py - y, px - x);
+        if (r === 0) angle = random(TWO_PI);
+        
+        let speed = random(2, 10);
+        
         popParticles.push({
-            x: x,
-            y: y,
-            vx: cos(angle) * speed,
-            vy: sin(angle) * speed,
-            size: random(15, 30),
-            alpha: 255
+            x: px,
+            y: py,
+            vx: cos(angle) * speed + random(-1.5, 1.5),
+            vy: sin(angle) * speed + random(-1.5, 1.5),
+            size: random(8, 25),
+            alpha: random(220, 255),
+            // 흰색, 하늘색, 연분홍빛의 물방울 테마 색상 믹스
+            color: random() > 0.5 ? [255, 255, 255] : (random() > 0.5 ? [180, 235, 255] : [255, 220, 240]),
+            decay: random(4, 9),
+            friction: random(0.94, 0.97)
         });
     }
 }
@@ -1802,16 +1828,24 @@ function createPopParticles(x, y) {
 function drawPopParticles() {
     for (let i = popParticles.length - 1; i >= 0; i--) {
         let p = popParticles[i];
+        
+        // 공기저항(마찰력)과 미세한 중력 효과 추가
+        p.vx *= p.friction;
+        p.vy *= p.friction;
+        p.vy += 0.08; // 미세한 중력 가속도로 흘러내리는 느낌 부여
+        
         p.x += p.vx;
         p.y += p.vy;
-        p.alpha -= 8;
-        p.size *= 0.95;
-        if (p.alpha <= 0) {
+        
+        p.alpha -= p.decay;
+        p.size *= 0.96;
+        
+        if (p.alpha <= 0 || p.size <= 0.8) {
             popParticles.splice(i, 1);
         } else {
             push();
             noStroke();
-            fill(255, 230, 240, p.alpha);
+            fill(p.color[0], p.color[1], p.color[2], p.alpha);
             ellipse(p.x, p.y, p.size, p.size);
             pop();
         }
@@ -1822,44 +1856,95 @@ function drawHandCursor() {
     if (trackedHands.length === 0) return;
 
     trackedHands.forEach(hand => {
-        // 1. 손 뼈대 구조 그리기 (흰색 라인 및 관절 포인트) - 왜곡 없는 매핑 적용
         push();
-        stroke(255, 255, 255, 200);
-        strokeWeight(6);
-        HAND_CONNECTIONS.forEach(conn => {
-            let p1 = mapLandmark(hand.landmarks[conn[0]]);
-            let p2 = mapLandmark(hand.landmarks[conn[1]]);
-            line(p1.x, p1.y, p2.x, p2.y);
-        });
-
-        // 관절 동그라미 그리기
-        fill(255, 255, 255);
-        noStroke();
-        hand.landmarks.forEach(p => {
-            let mappedP = mapLandmark(p);
-            ellipse(mappedP.x, mappedP.y, 16, 16);
-        });
-        pop();
-
-        // 2. 손 중심에 글래스모피즘 효과의 원형 포인터 그리기
-        push();
-        noStroke();
+        
+        // clenchFactor에 따른 스케일 배율 계산 (손을 더 쥘수록 최대 1.6배까지 커짐)
+        let clenchFactor = hand.clenchFactor || 0;
+        let scaleMult = 1.0 + clenchFactor * 0.6;
+        
+        // 1. 손 모양 상태에 따른 메인 포인터 그리기 (물결 효과 적용)
         if (hand.isFist) {
-            fill(255, 80, 80, 180);
-            ellipse(hand.x, hand.y, 80, 80);
-            stroke(255, 120, 120, 255);
-            strokeWeight(4);
+            // 주먹을 쥔 상태 (잡기): 안을 채운 미세 물결형 흰색 원 (2배 크기) + 외부 물결 링
+            let baseRadius = ((130 + sin(frameCount * 0.15) * 8) / 2) * scaleMult;
+            
+            // 메인 채워진 원
+            fill(255, 255, 255, 230);
+            noStroke();
+            beginShape();
+            for (let i = 0; i < 60; i++) {
+                let angle = (TWO_PI / 60) * i;
+                let wave = sin(angle * 5 + frameCount * 0.15) * (5 * scaleMult);
+                let r = baseRadius + wave;
+                vertex(hand.x + cos(angle) * r, hand.y + sin(angle) * r);
+            }
+            endShape(CLOSE);
+            
+            // 외부 은은한 맥동 물결 링
             noFill();
-            ellipse(hand.x, hand.y, 100, 100);
+            stroke(255, 255, 255, 100);
+            strokeWeight(2);
+            beginShape();
+            for (let i = 0; i < 60; i++) {
+                let angle = (TWO_PI / 60) * i;
+                let wave = cos(angle * 6 - frameCount * 0.1) * (4 * scaleMult);
+                let r = baseRadius + (15 * scaleMult) + wave;
+                vertex(hand.x + cos(angle) * r, hand.y + sin(angle) * r);
+            }
+            endShape(CLOSE);
         } else {
-            fill(80, 230, 255, 120);
-            ellipse(hand.x, hand.y, 60, 60);
-            stroke(120, 240, 255, 200);
-            strokeWeight(3);
+            // 손을 편 상태: 테두리(스트로크)만 있는 물결형 흰색 원 (2배 크기) + 외부 레이더형 물결 링
+            let baseRadius = ((140 + sin(frameCount * 0.08) * 10) / 2) * scaleMult;
+            
+            // 메인 스트로크 원
             noFill();
-            ellipse(hand.x, hand.y, 80, 80);
+            stroke(255, 255, 255, 220);
+            strokeWeight(5);
+            beginShape();
+            for (let i = 0; i < 60; i++) {
+                let angle = (TWO_PI / 60) * i;
+                let wave = sin(angle * 6 + frameCount * 0.08) * (6 * scaleMult);
+                let r = baseRadius + wave;
+                vertex(hand.x + cos(angle) * r, hand.y + sin(angle) * r);
+            }
+            endShape(CLOSE);
+            
+            // 외부 은은한 서브 물결 링
+            stroke(255, 255, 255, 60);
+            strokeWeight(2);
+            beginShape();
+            for (let i = 0; i < 60; i++) {
+                let angle = (TWO_PI / 60) * i;
+                let wave = sin(angle * 8 - frameCount * 0.05) * (5 * scaleMult);
+                let r = baseRadius + (20 * scaleMult) + wave;
+                vertex(hand.x + cos(angle) * r, hand.y + sin(angle) * r);
+            }
+            endShape(CLOSE);
         }
         pop();
+
+        // 2. 손을 편 상태일 때, 5개 손가락 끝에 미니 원(포인터) 그리기
+        if (!hand.isFist && hand.landmarks) {
+            push();
+            const fingertipIndices = [4, 8, 12, 16, 20]; // 엄지, 검지, 중지, 약지, 새끼
+            fingertipIndices.forEach(idx => {
+                let pt = mapLandmark(hand.landmarks[idx]);
+                
+                // 손끝 미니 원 그리기 (은은하게 맥동하는 미니 원형 추적선)
+                let miniSize = 16 + sin(frameCount * 0.15 + idx) * 3;
+                
+                // 외곽 스트로크 링
+                noFill();
+                stroke(255, 255, 255, 180);
+                strokeWeight(2.5);
+                ellipse(pt.x, pt.y, miniSize, miniSize);
+                
+                // 중심의 아주 작은 실선 도트
+                fill(255, 255, 255, 220);
+                noStroke();
+                ellipse(pt.x, pt.y, 6, 6);
+            });
+            pop();
+        }
     });
 }
 

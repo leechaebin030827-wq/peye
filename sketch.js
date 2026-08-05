@@ -3,12 +3,15 @@
 // --- [추가 및 수정 상수 정의] ---
 const SECOND_SCREEN_DELAY = 2000;
 const BUBBLE_SPAWN_INTERVAL = 1200; // 시간차를 더 늘려 차례대로 하나씩 등장하게 함 (1200ms)
+const BUBBLE_CLASSIFY_DURATION = 60; // 분류 판정 칩 노출 시간 (프레임 단위, 60프레임 = 약 1초)
 const SCREEN_MARGIN_Y = 200;       // 위아래 마진을 200px로 확대하여 부유 영역 고정
 const BUBBLE_START_X = 0.75;
 const BUBBLE_START_Y = 0.20;       // 물방울 발사 시작 높이를 더 위쪽으로 수정 (20% Y)
 const FIST_THRESHOLD = 0.12;
 
 const SECOND_BUBBLE_SIZE = 400;
+const SECOND_BUBBLE_MIN_SPEED = 5.5; // 기존 4.0에서 속도 약간 추가 상향
+const SECOND_BUBBLE_DAMPING = 0.99;  // 기존 0.98에서 감속률을 줄여 속도 유지
 const BUBBLE_X_SLANT = -80; // 버블 인덱스에 따라 X축으로 비스듬히 배치되는 값
 
 const ASSETS = {
@@ -132,6 +135,11 @@ const PART1_END_MSG1_DURATION = 2000;    // 메시지 1 표시 시간 (ms)
 const PART1_END_MSG2_DURATION = 1000;    // 메시지 2 표시 시간 (ms)
 const PART1_END_MSG3_DURATION = 2000;    // 마지막 메시지 유지 시간 (ms)
 
+// --- [part2_after_pop.png 크기 및 위치 상수] ---
+const PART2_AFTER_POP_X = 1080;          // 이미지 중심 X 좌표 (기본값: CANVAS_W / 2 = 1080)
+const PART2_AFTER_POP_Y = 1920;          // 이미지 중심 Y 좌표 (기본값: CANVAS_H / 2 = 1920)
+const PART2_AFTER_POP_WIDTH = 1600;      // 이미지 가로 크기
+
 let part1EndPopupResultImg;
 let part1EndPopupLoadingImg;
 let part1EndPopupMsg1Img;
@@ -143,6 +151,7 @@ let part1EndingStep = 0;
 let endingStepTimer = 0;
 
 let part2ActionGuidePopupImg;
+let part2AfterPopImg;
 let part2ActionGuideActive = false;
 let part2ActionGuideTriggered = false;
 
@@ -163,8 +172,8 @@ const DROP_HUMAN_FONT_SIZE = 40;
 
 // 상태 칩 크기 및 위치 조정 상수
 const STATUS_CHIP_SCALE = 0.85;   // 물방울 크기 대비 상태 칩 가로 비율 (예: 0.70 = 70%)
-const STATUS_CHIP_X_OFFSET = -15;   // 상태 칩 가로 위치 오프셋 (양수: 오른쪽, 음수: 왼쪽)
-const STATUS_CHIP_Y_OFFSET = 695;  // 물방울 상단 경계선 기준 Y축 오프셋 (양수: 물방울과 겹침, 음수: 물방울 위에 떠 있음)
+const STATUS_CHIP_X_OFFSET = -28;   // 상태 칩 가로 위치 오프셋 (양수: 오른쪽, 음수: 왼쪽)
+const STATUS_CHIP_Y_OFFSET = 703;  // 물방울 상단 경계선 기준 Y축 오프셋 (양수: 물방울과 겹침, 음수: 물방울 위에 떠 있음)
 
 // 상태 라이트(Status Light) 크기 및 위치 조정 상수 (유저가 나중에 조정하기 쉽도록 절대 좌표 설정)
 const STATUS_LIGHT_W = 110;        // 상태 라이트 이미지 가로 크기
@@ -184,8 +193,8 @@ const STATUS_MSG_Y = 3685;         // 상태 메시지 Y 좌표 (캔버스 절�
 const STATUS_MSG_ICON_W = 64;      // 상태 메시지 아이콘 가로 크기 (36px)
 const STATUS_MSG_FONT_SIZE = 64;   // 상태 메시지 폰트 크기 (35px)
 const STATUS_MSG_GAP = 28;         // 아이콘과 텍스트 사이의 간격
-const STATUS_MSG_STROKE = "#141414"; // 상태 메시지 외곽선 색상 (외곽선이 필요 없을 경우 생략하거나 두께를 0으로 설정)
-const STATUS_MSG_STROKE_W = 2;     // 상태 메시지 외곽선 두께 (0이면 외곽선 없음)
+const STATUS_MSG_STROKE = "#FEF5E1"; // 상태 메시지 외곽선 색상 (외곽선이 필요 없을 경우 생략하거나 두께를 0으로 설정)
+const STATUS_MSG_STROKE_W = 0.5;   // 상태 메시지 외곽선 두께 (0이면 외곽선 없음)
 
 // 폐기장 입구 (Disposal Port) 크기 및 위치 조정 상수
 const DISPOSAL_PORT_X = 1360;                // 이미지 시작 X 좌표
@@ -295,7 +304,7 @@ let serialBuffer = "";
 
 function preload() {
     // 배경 및 버블 이미지 텍스트 로드
-    bgImg = loadImage('assets/background.png');
+    bgImg = loadImage('assets/background.gif');
     background2Img = loadImage(ASSETS.background2);
     bubbleImg = loadImage('assets/bubble.png');
     galmuriFont = loadFont('assets/GalmuriMono11.ttf');
@@ -316,6 +325,7 @@ function preload() {
 
     // 2부 액션 가이드 팝업 이미지 로드
     part2ActionGuidePopupImg = loadImage('assets/part2_action_guide_popup.png');
+    part2AfterPopImg = loadImage('assets/part2_after_pop.png');
 
 }
 
@@ -325,8 +335,8 @@ function setup() {
     openingVideo = createVideo([ASSETS.video.opening]);
     openingVideo.hide();
 
-    // 폐기 진행 중 비디오 초기화
-    disposalVideo = createVideo(['assets/part1_disposal_in_progress.mp4']);
+    // webm 형식의 폐기 동영상 로드 (온점 두 개 포함된 파일명)
+    disposalVideo = createVideo(['assets/part1_disposal_in_progress..webm']);
     disposalVideo.hide();
 
     // 전시용 캔버스 생성
@@ -341,7 +351,7 @@ function setup() {
     // Matter.js 물리 엔진 초기화
     engine = Engine.create();
     world = engine.world;
-    world.gravity.y = 1.6; // 빠르고 생동감 있는 낙하를 위해 중력값을 약간 높게 설정
+    world.gravity.y = 1.6 * 2.5; // 2.5배 빠른 하강을 위해 중력값을 2.5배 높임
 
     // AI 및 Human 영역의 물리적 경계(벽, 바닥) 생성 (스폰 높이인 1400 부근부터 떨어질 때 탈출하지 않도록 벽을 위로 연장)
     const wallThickness = 60;
@@ -410,12 +420,10 @@ function setup() {
         globalLeftWall, globalRightWall, globalFloor
     ]);
 
-    // 풀 초기화 및 첫 번째 버블 생성
+    // 풀 초기화 (첫 번째 버블은 사용자의 첫 번째 버튼 입력/스페이스바 입력 시 생성되도록 함)
     initializeBubblePool();
-    currentBubble = getNextBubbleFromPool();
-    if (currentBubble) {
-        lastFullySpawnedType = currentBubble.type;
-    }
+    currentBubble = null;
+    lastFullySpawnedType = null;
     suctionDelayTimer = 0;
 }
 
@@ -430,9 +438,10 @@ function draw() {
 
         if (!isVideoStarted) {
             push();
+            noStroke();
             fill(255, 255, 255, 180);
             textAlign(CENTER, CENTER);
-            textFont(galmuriFont);
+            textFont('DNFBitBitv2');
             textSize(70);
             text("TAP TO START", CANVAS_W / 2, CANVAS_H / 2);
             pop();
@@ -509,15 +518,40 @@ function draw() {
             pop();
 
             // 현재 스텝에 맞는 이미지 출력
-            let currentPopupImg = null;
-            if (part1EndingStep === 0) currentPopupImg = part1EndPopupResultImg;
-            else if (part1EndingStep === 1) currentPopupImg = part1EndPopupLoadingImg;
-            else if (part1EndingStep === 2) currentPopupImg = part1EndPopupMsg1Img;
-            else if (part1EndingStep === 3) currentPopupImg = part1EndPopupMsg2Img;
-            else if (part1EndingStep === 4) currentPopupImg = part1EndPopupMsg3Img;
-
-            if (currentPopupImg) {
-                showEndPopup(currentPopupImg);
+            if (part1EndingStep < 0) {
+                // part2_after_pop.png 시퀀스
+                let elapsedForImg = millis() - endingStepTimer;
+                let alpha = 255;
+                if (part1EndingStep === -3) { // 1초 페이드인
+                    alpha = map(elapsedForImg, 0, 1000, 0, 255);
+                    alpha = constrain(alpha, 0, 255);
+                } else if (part1EndingStep === -2) { // 4초 유지
+                    alpha = 255;
+                } else if (part1EndingStep === -1) { // 1초 페이드아웃
+                    alpha = map(elapsedForImg, 0, 1000, 255, 0);
+                    alpha = constrain(alpha, 0, 255);
+                }
+                
+                if (part2AfterPopImg) {
+                    push();
+                    tint(255, alpha);
+                    imageMode(CENTER);
+                    let displayW = PART2_AFTER_POP_WIDTH;
+                    let displayH = part2AfterPopImg.height * (displayW / part2AfterPopImg.width);
+                    image(part2AfterPopImg, PART2_AFTER_POP_X, PART2_AFTER_POP_Y, displayW, displayH);
+                    pop();
+                }
+            } else {
+                let currentPopupImg = null;
+                if (part1EndingStep === 0) currentPopupImg = part1EndPopupResultImg;
+                else if (part1EndingStep === 1) currentPopupImg = part1EndPopupLoadingImg;
+                else if (part1EndingStep === 2) currentPopupImg = part1EndPopupMsg1Img;
+                else if (part1EndingStep === 3) currentPopupImg = part1EndPopupMsg2Img;
+                else if (part1EndingStep === 4) currentPopupImg = part1EndPopupMsg3Img;
+    
+                if (currentPopupImg) {
+                    showEndPopup(currentPopupImg);
+                }
             }
 
             // 시퀀스 자동 전환 타임라인 업데이트
@@ -578,19 +612,39 @@ function getNextBubbleFromPool() {
         reason: item.reason,
         wobbleOffset: random(0, 1000),
         spawnProgress: 0,
-        spawnDuration: 30
+        spawnDuration: 30,
+        isClassifying: false,
+        classifyProgress: 0,
+        classifyDuration: BUBBLE_CLASSIFY_DURATION
     };
 }
 
 /**
- * 상단 대기 버블을 떨어뜨리는 트리거 시퀀스를 시작합니다.
+ * 상단 대기 버블의 분류 판정 단계를 시작합니다 (분류 칩 노출).
  */
-function triggerBubbleDrop() {
-    if (part1EndingActive) return; // 엔딩 시퀀스 중에는 드롭 차단
+function triggerBubbleClassify() {
+    if (part1EndingActive) return; // 엔딩 시퀀스 중에는 분류 차단
     if (!currentBubble || isSequenceActive) return;
     if (currentBubble.spawnProgress < currentBubble.spawnDuration) return; // 완전히 생성된 후에만 트리거 가능
 
     isSequenceActive = true;
+    currentBubble.isClassifying = true;
+    currentBubble.classifyProgress = 0;
+    currentBubble.classifyDuration = BUBBLE_CLASSIFY_DURATION;
+
+    // 분류 시점에 상태 라이트를 켜고 판정 결과 칩 보여주기
+    activeLightType = currentBubble.type;
+    lastFullySpawnedType = currentBubble.type;
+}
+
+/**
+ * 상단 대기 버블을 축소시키며 아래로 떨어뜨리는 트리거 시퀀스를 시작합니다.
+ */
+function triggerBubbleDrop() {
+    if (part1EndingActive) return; // 엔딩 시퀀스 중에는 드롭 차단
+    if (!currentBubble) return;
+
+    currentBubble.isClassifying = false;
     currentBubble.isShrinking = true;
     currentBubble.shrinkProgress = 0;
     currentBubble.shrinkDuration = 25; // 25프레임 동안 축소 애니메이션 진행
@@ -598,10 +652,7 @@ function triggerBubbleDrop() {
     // 물방울 드롭 카운트 증가 (0 -> 10)
     droppedCount++;
 
-    // 상태 라이트 켜기 (레버를 당겼을 때 불켜짐)
-    activeLightType = currentBubble.type;
-
-    // 시스템 상태 업데이트
+    // 시스템 상태 업데이트 및 흡입 유도 사운드 재생
     systemState = "LeverDetected";
     playSound(sndBubbleEnterInlet);
 }
@@ -624,8 +675,8 @@ function startDropPhase(shrunkBubble) {
         y: 1550,
         size: 0,
         progress: 0,
-        // 프레임 수를 늘려 생성 속도를 늦추고 더 부드러운 하강 유도 (AI 45프레임, Human 90프레임)
-        maxFrames: isAI ? 45 : 90,
+        // 2.5배 빠른 하강을 위해 프레임 수를 2.5로 나눔 (AI 45 -> 18, Human 90 -> 36)
+        maxFrames: isAI ? 18 : 36,
         wobbleOffset: shrunkBubble.wobbleOffset || random(0, 1000),
         isFromSequence: true
     };
@@ -661,6 +712,16 @@ function drawCurrentBubble() {
                 startDropPhase(currentBubble);
                 currentBubble = null;
             }
+        } else if (currentBubble.isClassifying) {
+            if (currentBubble.classifyProgress < currentBubble.classifyDuration) {
+                currentBubble.classifyProgress++;
+            }
+            currentSize = SPAWN_SIZE; // 풀 사이즈 유지
+
+            // 분류 판정 칩 노출 완료 후 드롭(축소) 시퀀스 시작
+            if (currentBubble.classifyProgress >= currentBubble.classifyDuration) {
+                triggerBubbleDrop();
+            }
         } else {
             // 생성 애니메이션 진행
             if (currentBubble.spawnProgress < currentBubble.spawnDuration) {
@@ -669,6 +730,11 @@ function drawCurrentBubble() {
             const pct = currentBubble.spawnProgress / currentBubble.spawnDuration;
             const easePct = 1 - (1 - pct) * (1 - pct); // easeOutQuad
             currentSize = SPAWN_SIZE * easePct;
+
+            // 대기 물방울 생성 완료 후 자동으로 분류 판정 단계 시작
+            if (currentBubble.spawnProgress >= currentBubble.spawnDuration && !currentBubble.isClassifying && !currentBubble.isShrinking && !isSequenceActive) {
+                triggerBubbleClassify();
+            }
         }
 
         // 축소 완료로 인해 null이 되지 않은 경우에만 버블 그리기
@@ -682,16 +748,11 @@ function drawCurrentBubble() {
         }
     }
 
-    // 2. 상단 상태 칩 그리기 (물방울의 애니메이션 상태 및 Y축 하강 모션에 영향받지 않고 항상 고정된 SPAWN_SIZE 및 SPAWN_Y 위치 유지)
+    // 2. 상단 상태 칩 그리기 (분류가 시작되어 lastFullySpawnedType이 설정되었을 때만 표시하며, 상태 라이트가 켜져 있을 때만 함께 켜짐)
     push();
     translate(SPAWN_X, SPAWN_Y);
-    if (currentBubble && !currentBubble.isShrinking && currentBubble.spawnProgress >= currentBubble.spawnDuration) {
-        lastFullySpawnedType = currentBubble.type;
-        drawStatusChip(currentBubble, SPAWN_SIZE);
-    } else {
-        if (lastFullySpawnedType) {
-            drawStatusChip({ type: lastFullySpawnedType }, SPAWN_SIZE);
-        }
+    if (lastFullySpawnedType && activeLightType) {
+        drawStatusChip({ type: lastFullySpawnedType }, SPAWN_SIZE);
     }
     pop();
 
@@ -731,9 +792,8 @@ function drawPoppingBubbles() {
             spawnMatterBubble(pb);
             poppingBubbles.splice(i, 1);
 
-            // 시퀀스로 생성된 버블 낙하 시작 시, 상단에 새로운 대기 물방울 생성
+            // 시퀀스로 생성된 버블 낙하 시작 시, 자동으로 다음 대기 물방울을 생성하지 않고 시퀀스를 비활성화합니다.
             if (pb.isFromSequence) {
-                currentBubble = getNextBubbleFromPool();
                 isSequenceActive = false;
             }
         } else {
@@ -788,8 +848,8 @@ function spawnMatterBubble(pb) {
 
     World.add(world, body);
 
-    // 하강 가속을 주기 위한 초기 수직 속도 설정 (AI는 4.5, Human은 1.0으로 부드럽게 내림)
-    const velY = pb.type === "AI" ? 4.5 : 1.0;
+    // 1.3배 빠른 하강을 위한 초기 수직 속도 설정 (AI 4.5 * 1.3 = 5.85, Human 1.0 * 1.3 = 1.3)
+    const velY = pb.type === "AI" ? 5.85 : 1.3;
     Body.setVelocity(body, { x: 0, y: velY });
 
     // 렌더링에 필요한 메타데이터 정보를 물리 버블 리스트에 추가 (흔들림 관련 진폭 추가)
@@ -827,11 +887,11 @@ function drawPhysicalBubbles() {
             continue;
         }
 
-        // AI 버블과 Human 버블의 최고 하강 속도를 제어하여 너무 과격하게 곤두박질치거나 흐름이 끊기지 않도록 방지
-        if (pb.type === "Human" && pb.body.velocity.y > 1.8) {
-            Body.setVelocity(pb.body, { x: pb.body.velocity.x, y: 1.8 });
-        } else if (pb.type === "AI" && pb.body.velocity.y > 4.5) {
+        // AI 버블과 Human 버블의 최고 하강 속도를 2.5배 제어 (Human 1.8 * 2.5 = 4.5, AI 4.5 * 2.5 = 11.25)
+        if (pb.type === "Human" && pb.body.velocity.y > 4.5) {
             Body.setVelocity(pb.body, { x: pb.body.velocity.x, y: 4.5 });
+        } else if (pb.type === "AI" && pb.body.velocity.y > 11.25) {
+            Body.setVelocity(pb.body, { x: pb.body.velocity.x, y: 11.25 });
         }
 
         // 낙하 중일 때와 멈췄을 때의 뽀잉뽀잉/흔들림 진폭 제어 (안정적인 적재를 위해)
@@ -948,7 +1008,7 @@ function drawReasonPopups() {
             const pos = pb.body.position;
             push();
             imageMode(CORNER);
-            
+
             // 버블 위치에 맞게 사전에 계산된 동적 오프셋 적용 및 캔버스 화면 이탈 방지 constrain (무조건 물방울 왼쪽에 뜨도록 함)
             const rawX = pos.x + (pb.popupOffsetX !== undefined ? pb.popupOffsetX : (-REASON_POPUP_WIDTH - 80));
             const rawY = pos.y + (pb.popupOffsetY !== undefined ? pb.popupOffsetY : -REASON_POPUP_HEIGHT / 2);
@@ -1078,29 +1138,8 @@ async function readSerialLoop() {
 
                 for (let line of lines) {
                     line = line.trim();
-                    // 시리얼 트리거 신호 감지
                     if (line === "PULL" || line === "1") {
-                        if (part2ActionGuideActive) {
-                            part2ActionGuideActive = false;
-                            console.log("Part 2 Action Guide: Dismissed by serial PULL/1.");
-                        } else if (part1EndingActive) {
-                            if (part1EndingStep === 0) {
-                                part1EndingStep = 1;
-                                endingStepTimer = millis();
-                                console.log("Ending Sequence: Serial PULL/1 detected, starting loading (Step 1)");
-                            }
-                        } else if (currentAppState === APP_STATE.OPENING) {
-                            if (!isVideoStarted && openingVideo) {
-                                openingVideo.play();
-                                openingVideo.onended(() => {
-                                    currentAppState = APP_STATE.SORTING;
-                                    playBgm(sndStage1Bgm);
-                                });
-                                isVideoStarted = true;
-                            }
-                        } else {
-                            triggerBubbleDrop();
-                        }
+                        handleUserInputTrigger();
                     }
                 }
             }
@@ -1118,29 +1157,24 @@ async function readSerialLoop() {
 }
 
 /**
- * 개발용 키보드 입력을 처리합니다 (Spacebar).
+ * 키보드 입력(Spacebar 등) 또는 시리얼 PULL 신호를 처리하는 통합 핸들러입니다.
  */
-function keyPressed() {
+function handleUserInputTrigger() {
     if (part2ActionGuideActive) {
-        if (key === ' ' || key === 'Enter') {
-            part2ActionGuideActive = false;
-            console.log("Part 2 Action Guide: Dismissed by keyboard input.");
-        }
-        return; // 가이드 팝업 활성화 시 다른 키 입력 무시
+        part2ActionGuideActive = false;
+        console.log("Part 2 Action Guide: Dismissed by user trigger.");
+        return;
     }
 
     if (part1EndingActive) {
-        if (key === ' ' || key === 'Enter') {
-            if (part1EndingStep === 0) {
-                part1EndingStep = 1;
-                endingStepTimer = millis();
-                console.log("Ending Sequence: Keyboard input detected, starting loading (Step 1)");
-            }
+        if (part1EndingStep === 0) {
+            part1EndingStep = 1;
+            endingStepTimer = millis();
+            console.log("Ending Sequence: User trigger detected, starting loading (Step 1)");
         }
-        return; // 엔딩 시퀀스 활성화 시 다른 키 입력 무시
+        return;
     }
 
-    // 오프닝 비디오 시작 처리
     if (currentAppState === APP_STATE.OPENING) {
         if (!isVideoStarted && openingVideo) {
             openingVideo.play();
@@ -1153,9 +1187,29 @@ function keyPressed() {
         return;
     }
 
-    // 개발 테스트용 스페이스바 처리
-    if (key === ' ') {
-        triggerBubbleDrop();
+    if (currentAppState === APP_STATE.SORTING) {
+        // 이미 대기 물방울이 있거나, 드롭 시퀀스가 진행 중이거나, 낙하 애니메이션 진행 중이거나,
+        // 물리 버블 중 최근 버블이 아직 정착되지 않았거나, 흡입 연출 중이면 무시함
+        if (currentBubble || isSequenceActive || poppingBubbles.length > 0 || (activePhysicalBubble && !activePhysicalBubbleSettled) || systemState === "VacuumStart" || systemState === "Disposing" || systemState === "SortingFinished") {
+            return;
+        }
+
+        // 새 물방울 생성
+        currentBubble = getNextBubbleFromPool();
+        if (currentBubble) {
+            // 판정 칩을 처음에는 숨기기 위해 null로 리셋
+            lastFullySpawnedType = null;
+        }
+    }
+}
+
+/**
+ * 개발용 키보드 입력을 처리합니다 (Spacebar).
+ */
+function keyPressed() {
+    if (key === ' ' || key === 'Enter') {
+        handleUserInputTrigger();
+        return;
     }
 
     // 개발 테스트용 'P' 키 처리 (10개 즉시 분류 완료 스킵 단축키)
@@ -1406,7 +1460,7 @@ function drawStatusMessage() {
     if (!msgText || !statusMessageIconImg) return;
 
     push();
-    textFont(galmuriFont);
+    textFont('DNFBitBitv2');
     textSize(STATUS_MSG_FONT_SIZE);
 
     // 글자 간격 설정 (6%)
@@ -1425,14 +1479,21 @@ function drawStatusMessage() {
 
     // 텍스트 그리기
     textAlign(LEFT, CENTER);
+    noStroke();
     fill('#5E5544');
-    if (STATUS_MSG_STROKE_W > 0) {
-        stroke(STATUS_MSG_STROKE);
-        strokeWeight(STATUS_MSG_STROKE_W);
-    } else {
-        noStroke();
-    }
     text(msgText, textX, STATUS_MSG_Y);
+
+    if (STATUS_MSG_STROKE_W > 0) {
+        push();
+        drawingContext.save();
+        drawingContext.globalCompositeOperation = 'source-atop';
+        stroke(STATUS_MSG_STROKE);
+        strokeWeight(STATUS_MSG_STROKE_W * 2);
+        noFill();
+        text(msgText, textX, STATUS_MSG_Y);
+        drawingContext.restore();
+        pop();
+    }
 
     // 글자 간격 설정 초기화
     drawingContext.letterSpacing = "normal";
@@ -1498,7 +1559,7 @@ function drawDisposalPort() {
             currentAppState = APP_STATE.DISPOSING;
             playSound(sndSuctionDeviceAppear);
 
-            // 폐기 동영상 루프 재생 시작
+            // webm 형식의 폐기 동영상 루프 재생 시작
             if (disposalVideo) {
                 disposalVideo.loop();
                 disposalVideo.play();
@@ -1774,13 +1835,13 @@ function mapLandmark(p) {
     const videoElement = document.getElementById('webcam');
     const videoWidth = videoElement ? (videoElement.videoWidth || 640) : 640;
     const videoHeight = videoElement ? (videoElement.videoHeight || 480) : 480;
-    
+
     const camAspect = videoWidth / videoHeight;
     const canvasAspect = CANVAS_W / CANVAS_H;
-    
+
     let xMapped = p.x;
     let yMapped = p.y;
-    
+
     if (camAspect > canvasAspect) {
         // 카메라 가로 비율이 더 큼: 좌우 영역을 크롭하여 종횡비 일치시킴
         const croppedWidth = canvasAspect / camAspect;
@@ -1792,11 +1853,11 @@ function mapLandmark(p) {
         const startY = 0.5 - croppedHeight / 2;
         yMapped = (p.y - startY) / croppedHeight;
     }
-    
+
     // 0 ~ 1 범위로 제한
     xMapped = constrain(xMapped, 0, 1);
     yMapped = constrain(yMapped, 0, 1);
-    
+
     // 좌우 반전 거울 모드 적용 후 캔버스 픽셀 값으로 반환
     return {
         x: (1.0 - xMapped) * CANVAS_W,
@@ -1861,7 +1922,7 @@ function initializeHandTracking() {
                 });
                 let avgDist = distSum / 4;
                 let isFist = avgDist < FIST_THRESHOLD;
-                
+
                 // 손을 쥘수록 (avgDist가 작을수록) 1.0에 가까워지고, 펼수록 (avgDist가 클수록) 0.0에 가까워짐
                 let clenchFactor = map(avgDist, 0.22, 0.05, 0.0, 1.0, true);
 
@@ -1931,8 +1992,10 @@ function checkBubbleCollision() {
         });
 
         if (isGrabTriggered) {
-            popHumanBubble(bubble);
-            bubble.hadOpenHandInside = false; // 터졌으므로 리셋
+            bubble.state = "squeezing";
+            bubble.squeezeStartTime = millis();
+            bubble.squeezeDuration = 2000; // 2초 동안 말랑말랑 애니메이션
+            bubble.hadOpenHandInside = false; // 리셋
         } else if (isAnyHandInside) {
             // 물방울 안에 손이 존재하고, 그 중 편 손이 하나라도 있다면 hadOpenHandInside 활성화
             if (isAnyOpenHandInside) {
@@ -1968,7 +2031,7 @@ function handleReelsScrollTransition() {
     // 1. 1부 화면 내용 (위로 스크롤되어 올라감)
     push();
     translate(0, -scrollY);
-    
+
     // 1부 배경 그리기
     imageMode(CORNER);
     image(bgImg, 0, 0, CANVAS_W, CANVAS_H);
@@ -1988,7 +2051,7 @@ function handleReelsScrollTransition() {
     // 2. 2부 화면 내용 (아래에서 스크롤되어 올라옴)
     push();
     translate(0, CANVAS_H - scrollY);
-    
+
     // 2부 배경 그리기
     imageMode(CORNER);
     image(background2Img, 0, 0, CANVAS_W, CANVAS_H);
@@ -2014,9 +2077,9 @@ function createPopParticles(x, y) {
         // 버블 중심으로부터 외곽으로 퍼져나가는 벡터 계산
         let angle = atan2(py - y, px - x);
         if (r === 0) angle = random(TWO_PI);
-        
+
         let speed = random(2, 10);
-        
+
         popParticles.push({
             x: px,
             y: py,
@@ -2035,18 +2098,18 @@ function createPopParticles(x, y) {
 function drawPopParticles() {
     for (let i = popParticles.length - 1; i >= 0; i--) {
         let p = popParticles[i];
-        
+
         // 공기저항(마찰력)과 미세한 중력 효과 추가
         p.vx *= p.friction;
         p.vy *= p.friction;
         p.vy += 0.08; // 미세한 중력 가속도로 흘러내리는 느낌 부여
-        
+
         p.x += p.vx;
         p.y += p.vy;
-        
+
         p.alpha -= p.decay;
         p.size *= 0.96;
-        
+
         if (p.alpha <= 0 || p.size <= 0.8) {
             popParticles.splice(i, 1);
         } else {
@@ -2064,16 +2127,16 @@ function drawHandCursor() {
 
     trackedHands.forEach(hand => {
         push();
-        
+
         // clenchFactor에 따른 스케일 배율 계산 (손을 더 쥘수록 최대 1.6배까지 커짐)
         let clenchFactor = hand.clenchFactor || 0;
         let scaleMult = 1.0 + clenchFactor * 0.6;
-        
+
         // 1. 손 모양 상태에 따른 메인 포인터 그리기 (물결 효과 적용)
         if (hand.isFist) {
             // 주먹을 쥔 상태 (잡기): 안을 채운 미세 물결형 흰색 원 (2배 크기) + 외부 물결 링
             let baseRadius = ((130 + sin(frameCount * 0.15) * 8) / 2) * scaleMult;
-            
+
             // 메인 채워진 원
             fill(255, 255, 255, 230);
             noStroke();
@@ -2085,7 +2148,7 @@ function drawHandCursor() {
                 vertex(hand.x + cos(angle) * r, hand.y + sin(angle) * r);
             }
             endShape(CLOSE);
-            
+
             // 외부 은은한 맥동 물결 링
             noFill();
             stroke(255, 255, 255, 100);
@@ -2101,7 +2164,7 @@ function drawHandCursor() {
         } else {
             // 손을 편 상태: 테두리(스트로크)만 있는 물결형 흰색 원 (2배 크기) + 외부 레이더형 물결 링
             let baseRadius = ((140 + sin(frameCount * 0.08) * 10) / 2) * scaleMult;
-            
+
             // 메인 스트로크 원
             noFill();
             stroke(255, 255, 255, 220);
@@ -2114,7 +2177,7 @@ function drawHandCursor() {
                 vertex(hand.x + cos(angle) * r, hand.y + sin(angle) * r);
             }
             endShape(CLOSE);
-            
+
             // 외부 은은한 서브 물결 링
             stroke(255, 255, 255, 60);
             strokeWeight(2);
@@ -2135,16 +2198,16 @@ function drawHandCursor() {
             const fingertipIndices = [4, 8, 12, 16, 20]; // 엄지, 검지, 중지, 약지, 새끼
             fingertipIndices.forEach(idx => {
                 let pt = mapLandmark(hand.landmarks[idx]);
-                
+
                 // 손끝 미니 원 그리기 (은은하게 맥동하는 미니 원형 추적선)
                 let miniSize = 16 + sin(frameCount * 0.15 + idx) * 3;
-                
+
                 // 외곽 스트로크 링
                 noFill();
                 stroke(255, 255, 255, 180);
                 strokeWeight(2.5);
                 ellipse(pt.x, pt.y, miniSize, miniSize);
-                
+
                 // 중심의 아주 작은 실선 도트
                 fill(255, 255, 255, 220);
                 noStroke();
@@ -2197,16 +2260,16 @@ function drawSecondScreenBubbles() {
                 return;
             }
             // 뿅 튀어나온 속도를 서서히 감속시켜 둥둥 떠다니게 함
-            bubble.vx *= 0.98;
-            bubble.vy *= 0.98;
+            bubble.vx *= SECOND_BUBBLE_DAMPING;
+            bubble.vy *= SECOND_BUBBLE_DAMPING;
 
-            // 완전히 정지하지 않도록 최소 부유 속도 유지
+            // 완전히 정지하지 않도록 최소 부유 속도 유지 (기존 1.5 -> SECOND_BUBBLE_MIN_SPEED)
             let currentSpeed = dist(0, 0, bubble.vx, bubble.vy);
-            if (currentSpeed < 1.5) {
+            if (currentSpeed < SECOND_BUBBLE_MIN_SPEED) {
                 let angle = atan2(bubble.vy, bubble.vx);
                 if (currentSpeed === 0) angle = random(0, TWO_PI);
-                bubble.vx = cos(angle) * 1.5;
-                bubble.vy = sin(angle) * 1.5;
+                bubble.vx = cos(angle) * SECOND_BUBBLE_MIN_SPEED;
+                bubble.vy = sin(angle) * SECOND_BUBBLE_MIN_SPEED;
             }
 
             // 둥둥 떠다니는 움직임 업데이트
@@ -2233,6 +2296,47 @@ function drawSecondScreenBubbles() {
                 bubble.y = CANVAS_H - marginY - r;
                 bubble.vy *= -1;
             }
+        } else if (bubble.state === "squeezing") {
+            // 움켜쥐었을 때 2초 동안 말랑말랑한 상태를 유지한 후 터짐
+            let elapsedSqueeze = millis() - bubble.squeezeStartTime;
+            if (elapsedSqueeze >= bubble.squeezeDuration) {
+                popHumanBubble(bubble);
+            } else {
+                bubble.vx *= SECOND_BUBBLE_DAMPING;
+                bubble.vy *= SECOND_BUBBLE_DAMPING;
+
+                let currentSpeed = dist(0, 0, bubble.vx, bubble.vy);
+                if (currentSpeed < SECOND_BUBBLE_MIN_SPEED) {
+                    let angle = atan2(bubble.vy, bubble.vx);
+                    if (currentSpeed === 0) angle = random(0, TWO_PI);
+                    bubble.vx = cos(angle) * SECOND_BUBBLE_MIN_SPEED;
+                    bubble.vy = sin(angle) * SECOND_BUBBLE_MIN_SPEED;
+                }
+
+                bubble.x += bubble.vx;
+                bubble.y += bubble.vy;
+
+                // 경계 영역 충돌 판정
+                const r = SECOND_BUBBLE_SIZE / 2;
+                const marginX = 100;
+                const marginY = SCREEN_MARGIN_Y;
+
+                if (bubble.x - r < marginX) {
+                    bubble.x = marginX + r;
+                    bubble.vx *= -1;
+                } else if (bubble.x + r > CANVAS_W - marginX) {
+                    bubble.x = CANVAS_W - marginX - r;
+                    bubble.vx *= -1;
+                }
+
+                if (bubble.y - r < marginY) {
+                    bubble.y = marginY + r;
+                    bubble.vy *= -1;
+                } else if (bubble.y + r > CANVAS_H - marginY) {
+                    bubble.y = CANVAS_H - marginY - r;
+                    bubble.vy *= -1;
+                }
+            }
         } else if (bubble.state === "popping") {
             let tPop = (millis() - bubble.popStartTime) / bubble.popDuration;
             if (tPop >= 1) {
@@ -2256,18 +2360,35 @@ function drawSecondScreenBubbles() {
             imageMode(CENTER);
             translate(bubble.x, bubble.y);
 
+            let renderScale = bubble.scale;
             let wobbleX = 1.0;
             let wobbleY = 1.0;
             if (bubble.state === "active") {
                 let wobbleTime = frameCount * 0.15 + (bubble.y * 0.05);
                 wobbleX = 1.0 + sin(wobbleTime) * 0.03;
                 wobbleY = 1.0 - sin(wobbleTime) * 0.03;
+            } else if (bubble.state === "squeezing") {
+                // 움켜쥐었을 때 말랑말랑해지는 찌그러짐 애니메이션 (2초 동안 천천히 1회만 스퀴시)
+                let elapsedSqueeze = millis() - bubble.squeezeStartTime;
+                let progress = elapsedSqueeze / bubble.squeezeDuration; // 0.0 ~ 1.0
+                progress = constrain(progress, 0.0, 1.0);
+
+                // 2초 동안 단 1회만 천천히 찌그러지는 단일 주기
+                let squishCycle = sin(progress * TWO_PI);
+                let amp = 0.18 * sin(progress * PI); // 중간(1초) 즈음에 가장 찌그러짐이 크고 앞뒤로는 부드럽게 감소
+
+                wobbleX = 1.0 + squishCycle * amp;
+                wobbleY = 1.0 - squishCycle * amp;
+
+                // 서서히 부풀어 오르다가 터지기 직전에 원래대로 돌아오는 펄스 효과
+                let pulse = 1.0 + sin(progress * PI) * 0.12;
+                renderScale = bubble.scale * pulse;
             }
 
             tint(255, bubble.opacity * 255);
-            image(bubbleImg, 0, 0, SECOND_BUBBLE_SIZE * wobbleX * bubble.scale, SECOND_BUBBLE_SIZE * wobbleY * bubble.scale);
+            image(bubbleImg, 0, 0, SECOND_BUBBLE_SIZE * wobbleX * renderScale, SECOND_BUBBLE_SIZE * wobbleY * renderScale);
 
-            drawBubbleText(bubble.text, "Human", SECOND_BUBBLE_SIZE * bubble.scale);
+            drawBubbleText(bubble.text, "Human", SECOND_BUBBLE_SIZE * renderScale);
             pop();
         }
     });
@@ -2361,7 +2482,7 @@ function getSpawnScale(t) {
 function startPart1EndingSequence() {
     console.log("startPart1EndingSequence: Starting Part 1 Ending Sequence");
     part1EndingActive = true;
-    part1EndingStep = 0;
+    part1EndingStep = -3;
     endingStepTimer = millis();
 
     // 분류 관련 상태 정리
@@ -2389,7 +2510,23 @@ function updateEndingSequenceTimeline() {
 
     let elapsed = millis() - endingStepTimer;
 
-    if (part1EndingStep === 1) { // 로딩 팝업
+    if (part1EndingStep === -3) { // 1초 페이드인
+        if (elapsed >= 1000) {
+            part1EndingStep = -2;
+            endingStepTimer = millis();
+        }
+    } else if (part1EndingStep === -2) { // 4초 유지
+        if (elapsed >= 4000) {
+            part1EndingStep = -1;
+            endingStepTimer = millis();
+        }
+    } else if (part1EndingStep === -1) { // 1초 페이드아웃
+        if (elapsed >= 1000) {
+            part1EndingStep = 0;
+            endingStepTimer = millis();
+            console.log("Ending Sequence: Switched to Result Popup (Step 0)");
+        }
+    } else if (part1EndingStep === 1) { // 로딩 팝업
         if (elapsed >= PART1_END_LOADING_DURATION) {
             part1EndingStep = 2;
             endingStepTimer = millis();
@@ -2428,7 +2565,7 @@ function goToPart2() {
  */
 function resetToOpening() {
     console.log("resetToOpening: Resetting game to opening video screen.");
-    
+
     // 상태 리셋
     currentAppState = APP_STATE.OPENING;
     isVideoStarted = false;
@@ -2436,7 +2573,7 @@ function resetToOpening() {
         openingVideo.stop();
         openingVideo.show();
     }
-    
+
     // 변수 리셋
     droppedCount = 0;
     systemState = "Idle";
@@ -2444,11 +2581,11 @@ function resetToOpening() {
     isDisposalPortVisible = false;
     isDisposalPortAnimating = false;
     disposalPortAnimProgress = 0.0;
-    
+
     // 2부 액션 가이드 변수 리셋
     part2ActionGuideActive = false;
     part2ActionGuideTriggered = false;
-    
+
     // Matter.js 물리 객체들 정리
     physicalBubbles.forEach(pb => {
         World.remove(world, pb.body);
@@ -2457,13 +2594,13 @@ function resetToOpening() {
     currentBubble = null;
     poppingBubbles = [];
     isSequenceActive = false;
-    
+
     // 2부 버블 및 텍스트 정리
     secondScreenBubbles = [];
-    
+
     // 버블 풀 재생성
     initializeBubblePool();
-    
+
     // BGM 정지
     stopBgm();
 

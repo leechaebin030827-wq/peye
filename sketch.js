@@ -304,7 +304,7 @@ let serialBuffer = "";
 
 function preload() {
     // 배경 및 버블 이미지 텍스트 로드
-    bgImg = loadImage('assets/background.gif');
+    bgImg = loadImage('assets/background.png');
     background2Img = loadImage(ASSETS.background2);
     bubbleImg = loadImage('assets/bubble.png');
     galmuriFont = loadFont('assets/GalmuriMono11.ttf');

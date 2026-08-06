@@ -16,8 +16,8 @@ const BUBBLE_X_SLANT = -80; // 버블 인덱스에 따라 X축으로 비스듬�
 
 // --- [배경 레이어 애니메이션 상수] ---
 const BG_CLOUD_SCROLL_SPEED = 2.0;   // 구름 스크롤 속도 (픽셀/프레임, 값이 클수록 빠름)
-const BG_BUTTON_Y = 1870;            // 버튼 이미지 상단 Y 좌표 (조정 가능)
-const BG_BUTTON_BASE_X = 1250;       // 첫 번째(빨강) 버튼 왼쪽 X 좌표 (조정 가능)
+const BG_BUTTON_Y = 600;            // 버튼 이미지 상단 Y 좌표 (조정 가능)
+const BG_BUTTON_BASE_X = 1450;       // 첫 번째(빨강) 버튼 왼쪽 X 좌표 (조정 가능)
 const BG_BUTTON_GAP = 64;            // 버튼 이미지 사이 간격 px (조정 가능)
 const BG_BUTTON_CYCLE_MS = 1000;     // 버튼 하이라이트 전환 주기 ms (1000 = 1초)
 
@@ -326,6 +326,9 @@ let serialBuffer = "";
 // 배경 구름 레이어 스크롤 상태
 let cloudScrollX = 0;
 
+// 정적 배경 레이어(back + main) 합성 버퍼 (setup 이후 한 번만 렌더링)
+let bgCompositeBuffer = null;
+
 function preload() {
     // 배경 및 버블 이미지 텍스트 로드
     bgImg = loadImage('assets/background.png');
@@ -372,7 +375,8 @@ function setup() {
     disposalVideo = createVideo(['assets/part1_disposal_in_progress..webm']);
     disposalVideo.hide();
 
-    // 전시용 캔버스 생성
+    // 전시용 캔버스 생성 (pixelDensity(1) 로 Retina 4배 렌더링 방지)
+    pixelDensity(1);
     const canvas = createCanvas(CANVAS_W, CANVAS_H);
     canvas.parent('canvas-container');
 
@@ -458,6 +462,12 @@ function setup() {
     currentBubble = null;
     lastFullySpawnedType = null;
     suctionDelayTimer = 0;
+
+    // 정적 배경 버퍼 생성: background_back만 프리렌더
+    // (cloud는 back과 main 사이에 위치해야 하므로 main은 포함 안 함)
+    bgCompositeBuffer = createGraphics(CANVAS_W, CANVAS_H);
+    bgCompositeBuffer.imageMode(CORNER);
+    if (bgBackImg) bgCompositeBuffer.image(bgBackImg, 0, 0, CANVAS_W, CANVAS_H);
 }
 
 /**
@@ -470,24 +480,24 @@ function setup() {
 function drawLayeredBackground() {
     imageMode(CORNER);
 
-    // --- Layer 1: 정적 뒷 배경 ---
-    if (bgBackImg) {
-        image(bgBackImg, 0, 0, CANVAS_W, CANVAS_H);
+    // --- Layer 1: background_back (프리렌더 버퍼) ---
+    if (bgCompositeBuffer) {
+        image(bgCompositeBuffer, 0, 0);
+    } else {
+        if (bgBackImg) image(bgBackImg, 0, 0, CANVAS_W, CANVAS_H);
     }
 
-    // --- Layer 2: 구름 스크롤 ---
+    // --- Layer 2: background_cloud (왼쪽으로 무한 스크롤) ---
     if (bgCloudImg && bgCloudImg.height > 0) {
         let cloudDisplayW = bgCloudImg.width * (CANVAS_H / bgCloudImg.height);
         image(bgCloudImg, cloudScrollX, 0, cloudDisplayW, CANVAS_H);
         image(bgCloudImg, cloudScrollX + cloudDisplayW, 0, cloudDisplayW, CANVAS_H);
     }
 
-    // --- Layer 3: 정적 메인 배경 ---
-    if (bgMainImg) {
-        image(bgMainImg, 0, 0, CANVAS_W, CANVAS_H);
-    }
+    // --- Layer 3: background_main (구름 위에 들어가는 메인 레이어) ---
+    if (bgMainImg) image(bgMainImg, 0, 0, CANVAS_W, CANVAS_H);
 
-    // --- Layer 4: 버튼 3개 (1초마다 순환 하이라이트) ---
+    // --- Layer 4: 버튼 3개 ---
     if (bgButtonRedImg && bgButtonYellowImg && bgButtonBlueImg) {
         let activeBtn = floor(millis() / BG_BUTTON_CYCLE_MS) % 3;
         let btnImgs = [bgButtonRedImg, bgButtonYellowImg, bgButtonBlueImg];
@@ -513,7 +523,7 @@ function drawSortingSpinner() {
 
     // 버블이 공중에 있는 상태: 드롭 직후 ~ 바닥 정착 전
     let isInAir = (poppingBubbles.length > 0) ||
-                  (activePhysicalBubble && !activePhysicalBubbleSettled);
+        (activePhysicalBubble && !activePhysicalBubbleSettled);
     if (!isInAir) return;
 
     push();
@@ -528,23 +538,30 @@ function drawSortingSpinner() {
 function draw() {
     // 오프닝 영상 상태 처리
     if (currentAppState === APP_STATE.OPENING) {
-        background(0);
-        if (openingVideo) {
-            imageMode(CORNER);
-            image(openingVideo, 0, 0, CANVAS_W, CANVAS_H);
-        }
+        // 영상 종료를 draw() 루프에서 직접 감지하여 블랙 딜레이 제거
+        if (isVideoStarted && openingVideo && openingVideo.elt && openingVideo.elt.ended) {
+            currentAppState = APP_STATE.SORTING;
+            if (!currentBgm) playBgm(sndStage1Bgm);
+            // 이번 프레임은 아래 SORTING 로직으로 계속 진행
+        } else {
+            background(0);
+            if (openingVideo) {
+                imageMode(CORNER);
+                image(openingVideo, 0, 0, CANVAS_W, CANVAS_H);
+            }
 
-        if (!isVideoStarted) {
-            push();
-            noStroke();
-            fill(255, 255, 255, 180);
-            textAlign(CENTER, CENTER);
-            textFont('DNFBitBitv2');
-            textSize(70);
-            text("TAP TO START", CANVAS_W / 2, CANVAS_H / 2);
-            pop();
+            if (!isVideoStarted) {
+                push();
+                noStroke();
+                fill(255, 255, 255, 180);
+                textAlign(CENTER, CENTER);
+                textFont('DNFBitBitv2');
+                textSize(70);
+                text("TAP TO START", CANVAS_W / 2, CANVAS_H / 2);
+                pop();
+            }
+            return;
         }
-        return;
     }
 
     // 1. Matter.js 물리 엔진 업데이트 (프레임 드랍으로 인한 과도한 도약을 막기 위해 최대 가중치 제한)
@@ -638,7 +655,7 @@ function draw() {
                     alpha = map(elapsedForImg, 0, 1000, 255, 0);
                     alpha = constrain(alpha, 0, 255);
                 }
-                
+
                 if (part2AfterPopImg) {
                     push();
                     tint(255, alpha);
@@ -655,7 +672,7 @@ function draw() {
                 else if (part1EndingStep === 2) currentPopupImg = part1EndPopupMsg1Img;
                 else if (part1EndingStep === 3) currentPopupImg = part1EndPopupMsg2Img;
                 else if (part1EndingStep === 4) currentPopupImg = part1EndPopupMsg3Img;
-    
+
                 if (currentPopupImg) {
                     showEndPopup(currentPopupImg);
                 }

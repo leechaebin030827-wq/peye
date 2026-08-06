@@ -16,14 +16,14 @@ const BUBBLE_X_SLANT = -80; // 버블 인덱스에 따라 X축으로 비스듬�
 
 // --- [배경 레이어 애니메이션 상수] ---
 const BG_CLOUD_SCROLL_SPEED = 2.0;   // 구름 스크롤 속도 (픽셀/프레임, 값이 클수록 빠름)
-const BG_BUTTON_Y = 600;            // 버튼 이미지 상단 Y 좌표 (조정 가능)
-const BG_BUTTON_BASE_X = 1450;       // 첫 번째(빨강) 버튼 왼쪽 X 좌표 (조정 가능)
-const BG_BUTTON_GAP = 64;            // 버튼 이미지 사이 간격 px (조정 가능)
+const BG_BUTTON_Y = 400;            // 버튼 이미지 상단 Y 좌표 (조정 가능)
+const BG_BUTTON_BASE_X = 1300;       // 첫 번째(빨강) 버튼 왼쪽 X 좌표 (조정 가능)
+const BG_BUTTON_GAP = 56;            // 버튼 이미지 사이 간격 px (조정 가능)
 const BG_BUTTON_CYCLE_MS = 1000;     // 버튼 하이라이트 전환 주기 ms (1000 = 1초)
 
 // --- [분류 중 스피너 상수] ---
-const BG_SORTING_X = 140;            // 스피너 중심 X 좌표 (왼쪽 상단, 조정 가능)
-const BG_SORTING_Y = 140;            // 스피너 중심 Y 좌표 (왼쪽 상단, 조정 가능)
+const BG_SORTING_X = 200;            // 스피너 중심 X 좌표 (왼쪽 상단, 조정 가능)
+const BG_SORTING_Y = 200;            // 스피너 중심 Y 좌표 (왼쪽 상단, 조정 가능)
 const BG_SORTING_ROTATION_SPEED = 2.0; // 초당 회전 속도 (도, 값이 클수록 빠름)
 
 const ASSETS = {

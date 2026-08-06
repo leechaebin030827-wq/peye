@@ -21,6 +21,11 @@ const BG_BUTTON_BASE_X = 1250;       // 첫 번째(빨강) 버튼 왼쪽 X 좌�
 const BG_BUTTON_GAP = 64;            // 버튼 이미지 사이 간격 px (조정 가능)
 const BG_BUTTON_CYCLE_MS = 1000;     // 버튼 하이라이트 전환 주기 ms (1000 = 1초)
 
+// --- [분류 중 스피너 상수] ---
+const BG_SORTING_X = 140;            // 스피너 중심 X 좌표 (왼쪽 상단, 조정 가능)
+const BG_SORTING_Y = 140;            // 스피너 중심 Y 좌표 (왼쪽 상단, 조정 가능)
+const BG_SORTING_ROTATION_SPEED = 2.0; // 초당 회전 속도 (도, 값이 클수록 빠름)
+
 const ASSETS = {
     background2: "assets/background2.png",
     video: {
@@ -278,6 +283,7 @@ let bgMainImg;         // 메인 배경 레이어
 let bgButtonRedImg;    // 빨강 버튼 레이어
 let bgButtonYellowImg; // 노랑 버튼 레이어
 let bgButtonBlueImg;   // 파랑 버튼 레이어
+let bgSortingImg;      // 분류 중 스피너 이미지
 
 // 디버깅용 마우스 클릭 위치 추적 변수
 let lastClickX = -1;
@@ -332,6 +338,7 @@ function preload() {
     bgButtonRedImg = loadImage('assets/background_button_red.png');
     bgButtonYellowImg = loadImage('assets/background_button_yellow.png');
     bgButtonBlueImg = loadImage('assets/background_button_blue.png');
+    bgSortingImg = loadImage('assets/background_sorting.png');
     bubbleImg = loadImage('assets/bubble.png');
     galmuriFont = loadFont('assets/GalmuriMono11.ttf');
     statusChipAiImg = loadImage('assets/status_chip_available_ai.png');
@@ -497,6 +504,27 @@ function drawLayeredBackground() {
     }
 }
 
+/**
+ * 버블이 분류 중(공중에 있는 동안)에 왼쪽 상단에서 background_sorting.png를 회전시킵니다.
+ * 바닥에 닿으면(activePhysicalBubbleSettled) 사라집니다.
+ */
+function drawSortingSpinner() {
+    if (!bgSortingImg) return;
+
+    // 버블이 공중에 있는 상태: 드롭 직후 ~ 바닥 정착 전
+    let isInAir = (poppingBubbles.length > 0) ||
+                  (activePhysicalBubble && !activePhysicalBubbleSettled);
+    if (!isInAir) return;
+
+    push();
+    imageMode(CENTER);
+    translate(BG_SORTING_X, BG_SORTING_Y);
+    // deltaTime(ms) 기반으로 부드러운 회전
+    rotate(radians((millis() / 1000) * BG_SORTING_ROTATION_SPEED * 60));
+    image(bgSortingImg, 0, 0); // 원래 비율 그대로
+    pop();
+}
+
 function draw() {
     // 오프닝 영상 상태 처리
     if (currentAppState === APP_STATE.OPENING) {
@@ -554,6 +582,9 @@ function draw() {
 
         // 6. 상단 대기열의 떠 있는 버블 그리기
         drawCurrentBubble();
+
+        // 6.5 분류 중 스피너 그리기 (버블이 공중에 있을 때만)
+        drawSortingSpinner();
 
         // 7~8.5 오버레이 텍스트 및 UI 그리기
         drawCounterText();

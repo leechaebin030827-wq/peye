@@ -109,8 +109,14 @@ function initSounds() {
 function playSound(audioNode) {
     if (!audioNode) return;
     try {
-        let clone = audioNode.cloneNode();
-        clone.play().catch(err => console.log("Audio play blocked:", err));
+        if (audioNode.paused || audioNode.ended) {
+            audioNode.currentTime = 0;
+            audioNode.play().catch(err => console.log("Audio play blocked:", err));
+        } else {
+            let clone = audioNode.cloneNode();
+            clone.volume = audioNode.volume;
+            clone.play().catch(err => console.log("Audio clone play blocked:", err));
+        }
     } catch (e) {
         console.error("playSound error:", e);
     }
@@ -593,7 +599,14 @@ function draw() {
     }
 
     // 3. 배경 레이어 그리기 (TRANSITION 상태가 아닐 때만 개별 그리기, TRANSITION 시에는 scrollTransition에서 통합 처리)
-    if (currentAppState !== APP_STATE.TRANSITION) {
+    if (currentAppState === APP_STATE.SECOND_SCREEN) {
+        if (background2Img) {
+            imageMode(CORNER);
+            image(background2Img, 0, 0, CANVAS_W, CANVAS_H);
+        } else {
+            background(0);
+        }
+    } else if (currentAppState !== APP_STATE.TRANSITION) {
         drawLayeredBackground();
     }
 
@@ -630,12 +643,11 @@ function draw() {
         // 10. VacuumStart 및 Disposing 흡입 애니메이션 상태 제어
         updateVacuumAbsorption();
 
-        // --- 폐기 진행 중 비디오 오버레이 (화면 전체 채우기) ---
+        // --- 폐기 진행 중 커스텀 흡입 애니메이션 그리기 ---
         if (systemState === "VacuumStart" || systemState === "Disposing") {
-            if (disposalVideo) {
-                imageMode(CORNER);
-                image(disposalVideo, 0, 0, CANVAS_W, CANVAS_H);
-            }
+            let targetX = DISPOSAL_PORT_X + DISPOSAL_PORT_WIDTH / 2;
+            let targetY = DISPOSAL_PORT_VISIBLE_Y - 150;
+            updateAndDrawSuctionParticles(targetX, targetY);
         }
     } else if (currentAppState === APP_STATE.TRANSITION) {
         // 1단계 -> 2단계 릴스 스타일 수직 스크롤 전환 연출
@@ -745,7 +757,7 @@ function getNextBubbleFromPool() {
         return null;
     }
     const item = bubblePool.pop();
-    playSound(sndBubbleSpawn);
+    playSound(sndBubbleEnterInlet);
     return {
         text: item.text,
         type: item.type,
@@ -775,6 +787,13 @@ function triggerBubbleClassify() {
     // 분류 시점에 상태 라이트를 켜고 판정 결과 칩 보여주기
     activeLightType = currentBubble.type;
     lastFullySpawnedType = currentBubble.type;
+
+    // 분류 결과 사운드 재생
+    if (currentBubble.type === "AI") {
+        playSound(sndUsable);
+    } else {
+        playSound(sndUnusable);
+    }
 }
 
 /**
@@ -792,9 +811,8 @@ function triggerBubbleDrop() {
     // 물방울 드롭 카운트 증가 (0 -> 10)
     droppedCount++;
 
-    // 시스템 상태 업데이트 및 흡입 유도 사운드 재생
+    // 시스템 상태 업데이트
     systemState = "LeverDetected";
-    playSound(sndBubbleEnterInlet);
 }
 
 /**
@@ -822,6 +840,10 @@ function startDropPhase(shrunkBubble) {
     };
 
     poppingBubbles.push(newPopBubble);
+
+    // 물방울 나옴 + 물방울 배출 동시 재생
+    playSound(sndBubbleSpawn);
+    playSound(sndDischargeSuction);
 
     // 시스템 상태 업데이트 (분류 중)
     systemState = shrunkBubble.type === "AI" ? "SortingAI" : "SortingHuman";
@@ -987,6 +1009,7 @@ function spawnMatterBubble(pb) {
     });
 
     World.add(world, body);
+    body.type = pb.type;
 
     // 1.3배 빠른 하강을 위한 초기 수직 속도 설정 (AI 4.5 * 1.3 = 5.85, Human 1.0 * 1.3 = 1.3)
     const velY = pb.type === "AI" ? 5.85 : 1.3;
@@ -1584,7 +1607,9 @@ function updateLeverMessage() {
     }
 
     if (leverMessage !== prevMsg && leverMessage !== "") {
-        playSound(sndBottomMessage);
+        if (leverMessage.includes("해주세요")) {
+            playSound(sndBottomMessage);
+        }
     }
 }
 
@@ -1652,13 +1677,6 @@ function checkActiveBubbleSettling() {
             if (pos.y >= 2700 || activePhysicalBubble.speed < 0.2 || (frameCount - spawnFrameCount > 600)) {
                 activePhysicalBubbleSettled = true;
 
-                // 분류 결과 사운드 재생
-                if (activePhysicalBubble.type === "AI") {
-                    playSound(sndUsable);
-                } else {
-                    playSound(sndUnusable);
-                }
-
                 // 거의 떨어진 시점으로부터 1초 뒤에 상태를 'Idle' 또는 완료로 변경
                 setTimeout(() => {
                     // 상태 라이트 끄기
@@ -1699,11 +1717,13 @@ function drawDisposalPort() {
             currentAppState = APP_STATE.DISPOSING;
             playSound(sndSuctionDeviceAppear);
 
-            // webm 형식의 폐기 동영상 루프 재생 시작
+            // webm 형식의 폐기 동영상 루프 재생 시작 (비활성화)
+            /*
             if (disposalVideo) {
                 disposalVideo.loop();
                 disposalVideo.play();
             }
+            */
         }
     }
 
@@ -1898,10 +1918,12 @@ function completeDisposal() {
     currentAppState = APP_STATE.TRANSITION;
     transitionTimer = millis();
 
-    // 폐기 동영상 재생 정지
+    // 폐기 동영상 재생 정지 (비활성화)
+    /*
     if (disposalVideo) {
         disposalVideo.stop();
     }
+    */
 }
 
 function transitionToSecondScreen() {
@@ -2743,9 +2765,85 @@ function resetToOpening() {
     // BGM 정지
     stopBgm();
 
-    // 폐기 동영상 정지
+    // 폐기 동영상 정지 (비활성화)
+    /*
     if (disposalVideo) {
         disposalVideo.stop();
     }
+    */
+}
+
+function updateAndDrawSuctionParticles(targetX, targetY) {
+    // Adjust Y coordinate slightly to sit perfectly on top of the portal opening dark hole
+    let portalRimY = DISPOSAL_PORT_VISIBLE_Y + 40; 
+
+    // Organic squishy wobbling and bouncing up/down parameters
+    let time = frameCount * 0.08;
+    let floatY = sin(frameCount * 0.06) * 10; // Bouncing up/down
+    let scaleX = 1.0 + cos(time) * 0.05;      // Squeezing horizontally
+    let scaleY = 1.0 + sin(time) * 0.08;      // Stretching vertically
+
+    push();
+    translate(targetX, portalRimY + floatY);
+    scale(scaleX, scaleY);
+
+    // 1. Soft glowing blue/cyan background aura
+    noStroke();
+    for (let j = 5; j > 0; j--) {
+        let alpha = 25 - j * 4;
+        let w = 300 + j * 20;
+        let h = w * 0.45;
+        fill(0, 190, 255, alpha);
+        ellipse(0, -60, w, h);
+    }
+
+    // 2. Swirling concentric wobbly cyan/blue ovals forming a funnel
+    strokeWeight(1.5);
+    noFill();
+    let numRings = 12;
+    for (let i = 0; i < numRings; i++) {
+        let hOffset = -i * 10;
+        let pct = i / numRings;
+        
+        // Base width for this ring (wider as it goes up, like a funnel)
+        let baseW = lerp(260, 340, pct);
+        // Add dynamic wobbly fluid variation to width
+        let w = baseW + sin(time + i * 0.5) * 8;
+        let h = w * 0.35; // Oval shape matching the isometric view
+
+        // Beautiful cyan/blue gradient color mapping (no purple)
+        let rCol = lerp(0, 94, pct);
+        let gCol = lerp(200, 229, pct);
+        let bCol = lerp(255, 255, pct);
+        let alpha = map(i, 0, numRings, 180, 80);
+
+        stroke(rCol, gCol, bCol, alpha);
+        
+        push();
+        // Subtle rotational shift for each oval ring
+        rotate(sin(time * 0.5 + i * 0.2) * 0.05);
+        ellipse(0, hOffset, w, h);
+        pop();
+    }
+
+    // 3. Subtle rising particles (tiny cyan dust)
+    noStroke();
+    for (let i = 0; i < 15; i++) {
+        let tOffset = (frameCount + i * 40) % 200;
+        let pPct = tOffset / 200; 
+        
+        let pRadius = lerp(0, 150, pPct);
+        let pAngle = (i * (TWO_PI / 15)) + (pPct * TWO_PI * 0.5) + (i * 0.3);
+        
+        let px = cos(pAngle) * pRadius;
+        let py = sin(pAngle) * pRadius * 0.35 - (pPct * 150); // Rise upwards
+        
+        let pSize = lerp(8, 2, pPct);
+        let pAlpha = map(pPct, 0, 0.8, 180, 0, true);
+        
+        fill(94, 229, 255, pAlpha);
+        ellipse(px, py, pSize, pSize);
+    }
+    pop();
 }
 

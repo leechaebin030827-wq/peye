@@ -14,6 +14,13 @@ const SECOND_BUBBLE_MIN_SPEED = 5.5; // 기존 4.0에서 속도 약간 추가 �
 const SECOND_BUBBLE_DAMPING = 0.99;  // 기존 0.98에서 감속률을 줄여 속도 유지
 const BUBBLE_X_SLANT = -80; // 버블 인덱스에 따라 X축으로 비스듬히 배치되는 값
 
+// --- [배경 레이어 애니메이션 상수] ---
+const BG_CLOUD_SCROLL_SPEED = 2.0;   // 구름 스크롤 속도 (픽셀/프레임, 값이 클수록 빠름)
+const BG_BUTTON_Y = 1870;            // 버튼 이미지 상단 Y 좌표 (조정 가능)
+const BG_BUTTON_BASE_X = 1250;       // 첫 번째(빨강) 버튼 왼쪽 X 좌표 (조정 가능)
+const BG_BUTTON_GAP = 64;            // 버튼 이미지 사이 간격 px (조정 가능)
+const BG_BUTTON_CYCLE_MS = 1000;     // 버튼 하이라이트 전환 주기 ms (1000 = 1초)
+
 const ASSETS = {
     background2: "assets/background2.png",
     video: {
@@ -264,6 +271,14 @@ let statusMessageIconImg;
 let disposalPortImg;
 let reasonImg;
 
+// 배경 레이어 이미지 변수
+let bgBackImg;         // 가장 뒤 정적 배경
+let bgCloudImg;        // 스크롤 구름 레이어
+let bgMainImg;         // 메인 배경 레이어
+let bgButtonRedImg;    // 빨강 버튼 레이어
+let bgButtonYellowImg; // 노랑 버튼 레이어
+let bgButtonBlueImg;   // 파랑 버튼 레이어
+
 // 디버깅용 마우스 클릭 위치 추적 변수
 let lastClickX = -1;
 let lastClickY = -1;
@@ -302,10 +317,21 @@ let suctionDelayTimer = 0;      // 다음 버블 흡입까지의 대기 시간 �
 let serialReader = null;
 let serialBuffer = "";
 
+// 배경 구름 레이어 스크롤 상태
+let cloudScrollX = 0;
+
 function preload() {
     // 배경 및 버블 이미지 텍스트 로드
     bgImg = loadImage('assets/background.png');
     background2Img = loadImage(ASSETS.background2);
+
+    // 배경 레이어 이미지 로드
+    bgBackImg = loadImage('assets/background_back.png');
+    bgCloudImg = loadImage('assets/background_cloud.png');
+    bgMainImg = loadImage('assets/background_main.png');
+    bgButtonRedImg = loadImage('assets/background_button_red.png');
+    bgButtonYellowImg = loadImage('assets/background_button_yellow.png');
+    bgButtonBlueImg = loadImage('assets/background_button_blue.png');
     bubbleImg = loadImage('assets/bubble.png');
     galmuriFont = loadFont('assets/GalmuriMono11.ttf');
     statusChipAiImg = loadImage('assets/status_chip_available_ai.png');
@@ -427,6 +453,50 @@ function setup() {
     suctionDelayTimer = 0;
 }
 
+/**
+ * 1부 배경을 여러 레이어로 나눠 순서대로 그립니다.
+ * Layer 1: background_back.png  - 정적 배경
+ * Layer 2: background_cloud.png - 왼쪽으로 무한 스크롤
+ * Layer 3: background_main.png  - 정적 메인
+ * Layer 4: 버튼 3개              - 1초마다 순환 하이라이트
+ */
+function drawLayeredBackground() {
+    imageMode(CORNER);
+
+    // --- Layer 1: 정적 뒷 배경 ---
+    if (bgBackImg) {
+        image(bgBackImg, 0, 0, CANVAS_W, CANVAS_H);
+    }
+
+    // --- Layer 2: 구름 스크롤 ---
+    if (bgCloudImg && bgCloudImg.height > 0) {
+        let cloudDisplayW = bgCloudImg.width * (CANVAS_H / bgCloudImg.height);
+        image(bgCloudImg, cloudScrollX, 0, cloudDisplayW, CANVAS_H);
+        image(bgCloudImg, cloudScrollX + cloudDisplayW, 0, cloudDisplayW, CANVAS_H);
+    }
+
+    // --- Layer 3: 정적 메인 배경 ---
+    if (bgMainImg) {
+        image(bgMainImg, 0, 0, CANVAS_W, CANVAS_H);
+    }
+
+    // --- Layer 4: 버튼 3개 (1초마다 순환 하이라이트) ---
+    if (bgButtonRedImg && bgButtonYellowImg && bgButtonBlueImg) {
+        let activeBtn = floor(millis() / BG_BUTTON_CYCLE_MS) % 3;
+        let btnImgs = [bgButtonRedImg, bgButtonYellowImg, bgButtonBlueImg];
+        let offsetX = 0;
+
+        for (let i = 0; i < 3; i++) {
+            let alpha = (i === activeBtn) ? 255 : 40;
+            push();
+            tint(255, alpha);
+            image(btnImgs[i], BG_BUTTON_BASE_X + offsetX, BG_BUTTON_Y);
+            pop();
+            offsetX += btnImgs[i].width + BG_BUTTON_GAP;
+        }
+    }
+}
+
 function draw() {
     // 오프닝 영상 상태 처리
     if (currentAppState === APP_STATE.OPENING) {
@@ -454,10 +524,16 @@ function draw() {
         Engine.update(engine, Math.min(deltaTime, 30));
     }
 
-    // 2. 배경 이미지 그리기 (TRANSITION 상태가 아닐 때만 개별 그리기, TRANSITION 시에는 scrollTransition에서 통합 처리)
+    // 2. 구름 스크롤 상태 업데이트 (매 프레임, TRANSITION 포함 항상)
+    if (bgCloudImg && bgCloudImg.height > 0) {
+        let cloudDisplayW = bgCloudImg.width * (CANVAS_H / bgCloudImg.height);
+        cloudScrollX -= BG_CLOUD_SCROLL_SPEED;
+        if (cloudScrollX <= -cloudDisplayW) cloudScrollX = 0;
+    }
+
+    // 3. 배경 레이어 그리기 (TRANSITION 상태가 아닐 때만 개별 그리기, TRANSITION 시에는 scrollTransition에서 통합 처리)
     if (currentAppState !== APP_STATE.TRANSITION) {
-        imageMode(CORNER);
-        image(bgImg, 0, 0, CANVAS_W, CANVAS_H);
+        drawLayeredBackground();
     }
 
     // --- State-based Rendering & Logic ---
@@ -2032,9 +2108,8 @@ function handleReelsScrollTransition() {
     push();
     translate(0, -scrollY);
 
-    // 1부 배경 그리기
-    imageMode(CORNER);
-    image(bgImg, 0, 0, CANVAS_W, CANVAS_H);
+    // 1부 배경 레이어 그리기
+    drawLayeredBackground();
 
     // 1부 물리 버블 그리기
     drawPhysicalBubbles();

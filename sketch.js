@@ -27,8 +27,8 @@ const BG_SORTING_Y = 793;            // 스피너 중심 Y 좌표 (왼쪽 상단
 const BG_SORTING_ROTATION_SPEED = 2.0; // 초당 회전 속도 (도, 값이 클수록 빠름)
 
 // --- [제일 우 레이어 깨바기 상수] ---
-const BG_FACE_BLINK_X = 1591;        // face 이미지 왼쪽 상단 X 좌표
-const BG_FACE_BLINK_Y = 837;         // face 이미지 왼쪽 상단 Y 좌표
+const BG_FACE_BLINK_X = 1527;        // face 이미지 왼쪽 상단 X 좌표
+const BG_FACE_BLINK_Y = 791;         // face 이미지 왼쪽 상단 Y 좌표
 const BG_FACE_BLINK_MS = 1000;       // 깨바기 주기 (ms, 1000 = 1초마다 토글)
 
 const ASSETS = {
@@ -511,7 +511,7 @@ function drawLayeredBackground() {
         let offsetX = 0;
 
         for (let i = 0; i < 3; i++) {
-            let alpha = (i === activeBtn) ? 255 : 40;
+            let alpha = (i === activeBtn) ? 255 : 70;
             push();
             tint(255, alpha);
             image(btnImgs[i], BG_BUTTON_BASE_X + offsetX, BG_BUTTON_Y);

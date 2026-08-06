@@ -26,6 +26,11 @@ const BG_SORTING_X = 628;            // 스피너 중심 X 좌표 (왼쪽 상단
 const BG_SORTING_Y = 793;            // 스피너 중심 Y 좌표 (왼쪽 상단, 조정 가능)
 const BG_SORTING_ROTATION_SPEED = 2.0; // 초당 회전 속도 (도, 값이 클수록 빠름)
 
+// --- [깨바기 sorting 이미지 상수 (최상위 레이어)] ---
+const BG_SORTING_BLINK_X = 1591;     // 깨바기 이미지 왼쪽 상단 X 좌표
+const BG_SORTING_BLINK_Y = 837;      // 깨바기 이미지 왼쪽 상단 Y 좌표
+const BG_SORTING_BLINK_MS = 1000;    // 깨바기 주기 (ms, 1000 = 1초마다 토글)
+
 const ASSETS = {
     background2: "assets/background2.png",
     video: {
@@ -510,6 +515,15 @@ function drawLayeredBackground() {
             image(btnImgs[i], BG_BUTTON_BASE_X + offsetX, BG_BUTTON_Y);
             pop();
             offsetX += btnImgs[i].width + BG_BUTTON_GAP;
+        }
+    }
+
+    // --- Layer 5: sorting.png 깨바기 (최상위, 1초마다 토글) ---
+    if (bgSortingImg) {
+        let blinkOn = floor(millis() / BG_SORTING_BLINK_MS) % 2 === 0;
+        if (blinkOn) {
+            imageMode(CORNER);
+            image(bgSortingImg, BG_SORTING_BLINK_X, BG_SORTING_BLINK_Y);
         }
     }
 }

@@ -833,8 +833,8 @@ function startDropPhase(shrunkBubble) {
         y: 1550,
         size: 0,
         progress: 0,
-        // 2.5배 빠른 하강을 위해 프레임 수를 2.5로 나눔 (AI 45 -> 18, Human 90 -> 36)
-        maxFrames: isAI ? 18 : 36,
+        // 2.5배 빠른 하강을 위해 프레임 수를 2.5로 나눔 (AI 45 -> 18, Human 90 -> 36 -> 0.8배 조절로 45)
+        maxFrames: isAI ? 18 : 45,
         wobbleOffset: shrunkBubble.wobbleOffset || random(0, 1000),
         isFromSequence: true
     };
@@ -1011,8 +1011,8 @@ function spawnMatterBubble(pb) {
     World.add(world, body);
     body.type = pb.type;
 
-    // 1.3배 빠른 하강을 위한 초기 수직 속도 설정 (AI 4.5 * 1.3 = 5.85, Human 1.0 * 1.3 = 1.3)
-    const velY = pb.type === "AI" ? 5.85 : 1.3;
+    // 1.3배 빠른 하강을 위한 초기 수직 속도 설정 (AI 4.5 * 1.3 = 5.85, Human 1.0 * 1.3 * 0.8 = 1.04)
+    const velY = pb.type === "AI" ? 5.85 : 1.04;
     Body.setVelocity(body, { x: 0, y: velY });
 
     // 렌더링에 필요한 메타데이터 정보를 물리 버블 리스트에 추가 (흔들림 관련 진폭 추가)
@@ -1050,9 +1050,9 @@ function drawPhysicalBubbles() {
             continue;
         }
 
-        // AI 버블과 Human 버블의 최고 하강 속도를 2.5배 제어 (Human 1.8 * 2.5 = 4.5, AI 4.5 * 2.5 = 11.25)
-        if (pb.type === "Human" && pb.body.velocity.y > 4.5) {
-            Body.setVelocity(pb.body, { x: pb.body.velocity.x, y: 4.5 });
+        // AI 버블과 Human 버블의 최고 하강 속도 제어 (Human 4.5 * 0.8 = 3.6, AI 11.25)
+        if (pb.type === "Human" && pb.body.velocity.y > 3.6) {
+            Body.setVelocity(pb.body, { x: pb.body.velocity.x, y: 3.6 });
         } else if (pb.type === "AI" && pb.body.velocity.y > 11.25) {
             Body.setVelocity(pb.body, { x: pb.body.velocity.x, y: 11.25 });
         }
@@ -2295,11 +2295,11 @@ function drawHandCursor() {
 
         // 1. 손 모양 상태에 따른 메인 포인터 그리기 (물결 효과 적용)
         if (hand.isFist) {
-            // 주먹을 쥔 상태 (잡기): 안을 채운 미세 물결형 흰색 원 (2배 크기) + 외부 물결 링
+            // 주먹을 쥔 상태 (잡기): 안을 채운 미세 물결형 핑크색 원 (2배 크기) + 외부 물결 링
             let baseRadius = ((130 + sin(frameCount * 0.15) * 8) / 2) * scaleMult;
 
-            // 메인 채워진 원
-            fill(255, 255, 255, 230);
+            // 메인 채워진 원 (핑크색)
+            fill(255, 105, 180, 230);
             noStroke();
             beginShape();
             for (let i = 0; i < 60; i++) {
@@ -2310,9 +2310,9 @@ function drawHandCursor() {
             }
             endShape(CLOSE);
 
-            // 외부 은은한 맥동 물결 링
+            // 외부 은은한 맥동 물결 링 (연분홍색)
             noFill();
-            stroke(255, 255, 255, 100);
+            stroke(255, 182, 193, 140);
             strokeWeight(2);
             beginShape();
             for (let i = 0; i < 60; i++) {

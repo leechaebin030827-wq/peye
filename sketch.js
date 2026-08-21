@@ -869,7 +869,7 @@ function draw() {
                 else if (part1EndingStep === 1) currentPopupImg = part1EndPopupLoadingImg;
                 else if (part1EndingStep === 2) currentPopupImg = part1EndPopupMsg1Img;
                 else if (part1EndingStep === 3) currentPopupImg = part1EndPopupMsg2Img;
-                else if (part1EndingStep === 4) currentPopupImg = part1EndPopupMsg3Img;
+                else if (part1EndingStep === 4 || part1EndingStep === 5) currentPopupImg = part1EndPopupMsg3Img;
 
                 if (currentPopupImg) {
                     showEndPopup(currentPopupImg);
@@ -1506,6 +1506,12 @@ function handleUserInputTrigger() {
             part1EndingStep = 1;
             endingStepTimer = millis();
             console.log("Ending Sequence: User trigger detected, starting loading (Step 1)");
+            return;
+        }
+        if (part1EndingStep >= 1) {
+            console.log("Ending Sequence: User trigger detected at final ending. Reloading page.");
+            location.reload();
+            return;
         }
         return;
     }
@@ -2888,9 +2894,9 @@ function updateEndingSequenceTimeline() {
             endingStepTimer = millis();
             console.log("Ending Sequence: Switched to Message 03 (Step 4)");
         }
-    } else if (part1EndingStep === 4) { // 메시지 03 유지 후 2부 전환
+    } else if (part1EndingStep === 4) { // 메시지 03 유지를 거쳐 최종 대기 상태로 유지
         if (elapsed >= PART1_END_MSG3_DURATION) {
-            goToPart2();
+            part1EndingStep = 5; // 최종 화면 대기 (스페이스바 클릭 시 새로고침)
         }
     }
 }

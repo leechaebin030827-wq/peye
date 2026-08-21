@@ -2428,7 +2428,7 @@ function drawSecondScreenBubbles() {
             let t = (elapsed - bubble.spawnTimeOffset) / spawnDuration;
             if (t >= 0) {
                 if (bubble.scale === 0.0) {
-                    playSound(sndBubbleSpawn);
+                    playSound(sndBubbleSpawn, 3.0);
                 }
                 if (t >= 1) {
                     bubble.state = "active";

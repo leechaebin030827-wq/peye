@@ -228,7 +228,7 @@ function playBbyorongSound() {
         osc1.frequency.exponentialRampToValueAtTime(880, now + 0.06);
 
         gain1.gain.setValueAtTime(0.001, now);
-        gain1.gain.linearRampToValueAtTime(0.22, now + 0.015); // 0.5배로 줄임
+        gain1.gain.linearRampToValueAtTime(0.11, now + 0.015); // 볼륨 0.5배 추가 감소
         gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
 
         osc1.connect(gain1);
@@ -247,7 +247,7 @@ function playBbyorongSound() {
         osc2.frequency.exponentialRampToValueAtTime(1470, startTime2 + 0.09);
 
         gain2.gain.setValueAtTime(0.001, startTime2);
-        gain2.gain.linearRampToValueAtTime(0.25, startTime2 + 0.015); // 0.5배로 줄임
+        gain2.gain.linearRampToValueAtTime(0.12, startTime2 + 0.015); // 볼륨 0.5배 추가 감소
         gain2.gain.exponentialRampToValueAtTime(0.001, startTime2 + 0.22);
 
         osc2.connect(gain2);

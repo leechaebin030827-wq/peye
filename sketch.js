@@ -195,7 +195,7 @@ function playDynamicWhoosh(intensity = 0.5) {
         filter.frequency.exponentialRampToValueAtTime(baseFreq, now + 0.26);
 
         let gainNode = ctx.createGain();
-        let maxGain = Math.min(0.4, 0.08 + intensity * 0.30); // 자극적이지 않고 부드러운 볼륨
+        let maxGain = Math.min(0.55, (0.08 + intensity * 0.30) * 1.3); // 기존 대비 1.3배 키움
         gainNode.gain.setValueAtTime(0.001, now);
         gainNode.gain.linearRampToValueAtTime(maxGain, now + 0.08);
         gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
@@ -228,7 +228,7 @@ function playBbyorongSound() {
         osc1.frequency.exponentialRampToValueAtTime(880, now + 0.06);
 
         gain1.gain.setValueAtTime(0.001, now);
-        gain1.gain.linearRampToValueAtTime(0.45, now + 0.015);
+        gain1.gain.linearRampToValueAtTime(0.22, now + 0.015); // 0.5배로 줄임
         gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
 
         osc1.connect(gain1);
@@ -247,7 +247,7 @@ function playBbyorongSound() {
         osc2.frequency.exponentialRampToValueAtTime(1470, startTime2 + 0.09);
 
         gain2.gain.setValueAtTime(0.001, startTime2);
-        gain2.gain.linearRampToValueAtTime(0.50, startTime2 + 0.015);
+        gain2.gain.linearRampToValueAtTime(0.25, startTime2 + 0.015); // 0.5배로 줄임
         gain2.gain.exponentialRampToValueAtTime(0.001, startTime2 + 0.22);
 
         osc2.connect(gain2);

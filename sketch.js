@@ -148,6 +148,92 @@ function playSound(audioNode, gainMultiplier = 1.0) {
     }
 }
 
+// --- [핸드트래킹 손 이동 속도 감지 및 동적 Whoosh 효과음 생성기] ---
+let lastWhooshTime = 0;
+let prevHandPositions = [];
+let whooshNoiseBuffer = null;
+
+function createNoiseBuffer(ctx) {
+    if (whooshNoiseBuffer) return whooshNoiseBuffer;
+    let bufferSize = ctx.sampleRate * 0.3;
+    let buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    let output = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+    }
+    whooshNoiseBuffer = buffer;
+    return buffer;
+}
+
+function playDynamicWhoosh(intensity = 0.5) {
+    let ctx = getAudioContext();
+    if (!ctx) return;
+
+    try {
+        let noiseBuf = createNoiseBuffer(ctx);
+        let source = ctx.createBufferSource();
+        source.buffer = noiseBuf;
+
+        let filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.Q.value = 2.2;
+
+        let now = ctx.currentTime;
+        let baseFreq = 220 + intensity * 350;
+        let peakFreq = 650 + intensity * 1600;
+
+        filter.frequency.setValueAtTime(baseFreq, now);
+        filter.frequency.exponentialRampToValueAtTime(peakFreq, now + 0.07);
+        filter.frequency.exponentialRampToValueAtTime(baseFreq, now + 0.20);
+
+        let gainNode = ctx.createGain();
+        let maxGain = Math.min(0.9, 0.25 + intensity * 0.65);
+        gainNode.gain.setValueAtTime(0.001, now);
+        gainNode.gain.linearRampToValueAtTime(maxGain, now + 0.05);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+
+        source.connect(filter);
+        filter.connect(gainNode);
+        gainNode.connect(ctx.destination);
+
+        source.start(now);
+        source.stop(now + 0.23);
+    } catch (err) {
+        console.error("playDynamicWhoosh error:", err);
+    }
+}
+
+function updateHandWhooshEffect() {
+    if (currentAppState !== APP_STATE.SECOND_SCREEN) return;
+    if (!trackedHands || trackedHands.length === 0) {
+        prevHandPositions = [];
+        return;
+    }
+
+    let maxSpeed = 0;
+    trackedHands.forEach((hand, idx) => {
+        let prev = prevHandPositions[idx];
+        if (prev) {
+            let dx = hand.x - prev.x;
+            let dy = hand.y - prev.y;
+            let distMoved = Math.sqrt(dx * dx + dy * dy);
+            if (distMoved > maxSpeed) {
+                maxSpeed = distMoved;
+            }
+        }
+    });
+
+    prevHandPositions = trackedHands.map(h => ({ x: h.x, y: h.y }));
+
+    let now = millis();
+    let speedThreshold = 30; // 30px 이상 손이 빠르게 움직일 때 발동
+    if (maxSpeed > speedThreshold && (now - lastWhooshTime > 160)) {
+        let intensity = map(maxSpeed, speedThreshold, 160, 0.3, 1.0, true);
+        playDynamicWhoosh(intensity);
+        lastWhooshTime = now;
+    }
+}
+
 function playBgm(bgmNode) {
     if (currentBgm === bgmNode) return;
     if (currentBgm) {
@@ -2122,8 +2208,10 @@ function initializeHandTracking() {
                     landmarks: landmarks
                 });
             }
+            updateHandWhooshEffect();
         } else {
             isHandPresent = false;
+            prevHandPositions = [];
         }
     });
 

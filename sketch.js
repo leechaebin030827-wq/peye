@@ -1759,7 +1759,7 @@ function updateLeverMessage() {
             leverMessage = "분류중입니다..";
             break;
         case "SortingHuman":
-            leverMessage = "분류중입니다.. 물방울을 손으로 터치해보세요.";
+            leverMessage = "분류중입니다.. 물방울을 보세요.";
             break;
         case "SortingFinished":
             leverMessage = "분류가 완료되었습니다.";

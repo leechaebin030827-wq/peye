@@ -151,15 +151,22 @@ function playSound(audioNode, gainMultiplier = 1.0) {
 // --- [핸드트래킹 손 이동 속도 감지 및 동적 Whoosh 효과음 생성기] ---
 let lastWhooshTime = 0;
 let prevHandPositions = [];
+let prevHandFistStates = [];
 let whooshNoiseBuffer = null;
 
 function createNoiseBuffer(ctx) {
     if (whooshNoiseBuffer) return whooshNoiseBuffer;
-    let bufferSize = ctx.sampleRate * 0.3;
+    let bufferSize = ctx.sampleRate * 0.35; // 0.35초 노이즈
     let buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     let output = buffer.getChannelData(0);
+    // 부드럽고 따뜻한 바람 소리를 위한 핑크/브라운 노이즈 필터링
+    let b0 = 0, b1 = 0, b2 = 0;
     for (let i = 0; i < bufferSize; i++) {
-        output[i] = Math.random() * 2 - 1;
+        let white = Math.random() * 2 - 1;
+        b0 = 0.99 * b0 + white * 0.05;
+        b1 = 0.95 * b1 + white * 0.1;
+        b2 = 0.85 * b2 + white * 0.15;
+        output[i] = (b0 + b1 + b2) * 0.4;
     }
     whooshNoiseBuffer = buffer;
     return buffer;
@@ -174,30 +181,31 @@ function playDynamicWhoosh(intensity = 0.5) {
         let source = ctx.createBufferSource();
         source.buffer = noiseBuf;
 
+        // 날카롭지 않고 부드러운 로우패스 필터 적용 (낮은 Q값으로 온화한 바람 소리 연출)
         let filter = ctx.createBiquadFilter();
-        filter.type = 'bandpass';
-        filter.Q.value = 2.2;
+        filter.type = 'lowpass';
+        filter.Q.value = 0.8;
 
         let now = ctx.currentTime;
-        let baseFreq = 220 + intensity * 350;
-        let peakFreq = 650 + intensity * 1600;
+        let baseFreq = 160 + intensity * 150;  // 160 ~ 310 Hz
+        let peakFreq = 380 + intensity * 450;  // 380 ~ 830 Hz (날카로운 고음 제거)
 
         filter.frequency.setValueAtTime(baseFreq, now);
-        filter.frequency.exponentialRampToValueAtTime(peakFreq, now + 0.07);
-        filter.frequency.exponentialRampToValueAtTime(baseFreq, now + 0.20);
+        filter.frequency.exponentialRampToValueAtTime(peakFreq, now + 0.09);
+        filter.frequency.exponentialRampToValueAtTime(baseFreq, now + 0.26);
 
         let gainNode = ctx.createGain();
-        let maxGain = Math.min(0.9, 0.25 + intensity * 0.65);
+        let maxGain = Math.min(0.4, 0.08 + intensity * 0.30); // 자극적이지 않고 부드러운 볼륨
         gainNode.gain.setValueAtTime(0.001, now);
-        gainNode.gain.linearRampToValueAtTime(maxGain, now + 0.05);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        gainNode.gain.linearRampToValueAtTime(maxGain, now + 0.08);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
 
         source.connect(filter);
         filter.connect(gainNode);
         gainNode.connect(ctx.destination);
 
         source.start(now);
-        source.stop(now + 0.23);
+        source.stop(now + 0.30);
     } catch (err) {
         console.error("playDynamicWhoosh error:", err);
     }
@@ -2199,6 +2207,12 @@ function initializeHandTracking() {
                 let avgDist = distSum / 4;
                 let isFist = avgDist < FIST_THRESHOLD;
 
+                // 손을 쥐며 커서가 핑크색으로 변하는 순간 효과음 재생!
+                if (isFist && !prevHandFistStates[i]) {
+                    playSound(sndBubbleSpawn, 3.0);
+                }
+                prevHandFistStates[i] = isFist;
+
                 // 손을 쥘수록 (avgDist가 작을수록) 1.0에 가까워지고, 펼수록 (avgDist가 클수록) 0.0에 가까워짐
                 let clenchFactor = map(avgDist, 0.22, 0.05, 0.0, 1.0, true);
 
@@ -2214,6 +2228,7 @@ function initializeHandTracking() {
         } else {
             isHandPresent = false;
             prevHandPositions = [];
+            prevHandFistStates = [];
         }
     });
 

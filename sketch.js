@@ -93,7 +93,7 @@ function initSounds() {
 
     // --- [효과음 및 배경음 볼륨 조절 설정 (0.0 ~ 1.0)] ---
     sndBubbleSpawn.volume = 1.0;
-    sndDischargeSuction.volume = 1.0;
+    sndDischargeSuction.volume = 0.5; // 배출 소리 원래대로 복구 (0.5)
     sndBubbleEnterInlet.volume = 0.5;
     sndBubbleSuction.volume = 0.5;
     sndSuctionDeviceAppear.volume = 0.5;
@@ -867,9 +867,9 @@ function startDropPhase(shrunkBubble) {
 
     poppingBubbles.push(newPopBubble);
 
-    // 물방울 나옴 + 물방울 배출 동시 재생 (3배 볼륨 증폭)
+    // 물방울 생성 띠링 소리만 3배 증폭, 배출 소리는 원래대로 재생
     playSound(sndBubbleSpawn, 3.0);
-    playSound(sndDischargeSuction, 3.0);
+    playSound(sndDischargeSuction);
 
     // 시스템 상태 업데이트 (분류 중)
     systemState = shrunkBubble.type === "AI" ? "SortingAI" : "SortingHuman";

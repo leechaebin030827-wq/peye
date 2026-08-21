@@ -92,8 +92,8 @@ function initSounds() {
     sndBubblePop = new Audio(ASSETS.audio.bubblePop);
 
     // --- [효과음 및 배경음 볼륨 조절 설정 (0.0 ~ 1.0)] ---
-    sndBubbleSpawn.volume = 0.8;
-    sndDischargeSuction.volume = 0.5;
+    sndBubbleSpawn.volume = 1.0;
+    sndDischargeSuction.volume = 1.0;
     sndBubbleEnterInlet.volume = 0.5;
     sndBubbleSuction.volume = 0.5;
     sndSuctionDeviceAppear.volume = 0.5;
@@ -103,19 +103,45 @@ function initSounds() {
     sndBottomMessage.volume = 0.5;
     sndStage1Bgm.volume = 0.2; // BGM은 효과음 대비 작게 설정
     sndStage2Bgm.volume = 0.2;
-    sndBubblePop.volume = 0.6;
+    sndBubblePop.volume = 1.0;
 }
 
-function playSound(audioNode) {
+let audioCtx = null;
+function getAudioContext() {
+    if (!audioCtx) {
+        let AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+            audioCtx = new AudioContextClass();
+        }
+    }
+    if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+    return audioCtx;
+}
+
+function playSound(audioNode, gainMultiplier = 1.0) {
     if (!audioNode) return;
     try {
-        if (audioNode.paused || audioNode.ended) {
-            audioNode.currentTime = 0;
-            audioNode.play().catch(err => console.log("Audio play blocked:", err));
-        } else {
+        let ctx = getAudioContext();
+        if (ctx && gainMultiplier > 1.0) {
             let clone = audioNode.cloneNode();
             clone.volume = audioNode.volume;
+            let source = ctx.createMediaElementSource(clone);
+            let gainNode = ctx.createGain();
+            gainNode.gain.value = gainMultiplier;
+            source.connect(gainNode);
+            gainNode.connect(ctx.destination);
             clone.play().catch(err => console.log("Audio clone play blocked:", err));
+        } else {
+            if (audioNode.paused || audioNode.ended) {
+                audioNode.currentTime = 0;
+                audioNode.play().catch(err => console.log("Audio play blocked:", err));
+            } else {
+                let clone = audioNode.cloneNode();
+                clone.volume = audioNode.volume;
+                clone.play().catch(err => console.log("Audio clone play blocked:", err));
+            }
         }
     } catch (e) {
         console.error("playSound error:", e);
@@ -841,9 +867,9 @@ function startDropPhase(shrunkBubble) {
 
     poppingBubbles.push(newPopBubble);
 
-    // 물방울 나옴 + 물방울 배출 동시 재생
-    playSound(sndBubbleSpawn);
-    playSound(sndDischargeSuction);
+    // 물방울 나옴 + 물방울 배출 동시 재생 (3배 볼륨 증폭)
+    playSound(sndBubbleSpawn, 3.0);
+    playSound(sndDischargeSuction, 3.0);
 
     // 시스템 상태 업데이트 (분류 중)
     systemState = shrunkBubble.type === "AI" ? "SortingAI" : "SortingHuman";
@@ -2175,7 +2201,8 @@ function popHumanBubble(bubble) {
     bubble.popStartTime = millis();
     bubble.popDuration = 350; // 350ms
 
-    playSound(sndBubblePop);
+    // 핸드트래킹 버블 팝 효과음 (3배 볼륨 증폭)
+    playSound(sndBubblePop, 3.0);
     createPopParticles(bubble.x, bubble.y);
 }
 

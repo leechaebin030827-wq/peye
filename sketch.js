@@ -211,6 +211,56 @@ function playDynamicWhoosh(intensity = 0.5) {
     }
 }
 
+// --- [손 주먹 감지 (핑크색 커서 변환) 시 커스텀 뾰롱 효과음 생성기] ---
+function playBbyorongSound() {
+    let ctx = getAudioContext();
+    if (!ctx) return;
+
+    try {
+        let now = ctx.currentTime;
+
+        // 1음: '뾰' (빠른 상향 피치 스위프)
+        let osc1 = ctx.createOscillator();
+        let gain1 = ctx.createGain();
+
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(520, now);
+        osc1.frequency.exponentialRampToValueAtTime(880, now + 0.06);
+
+        gain1.gain.setValueAtTime(0.001, now);
+        gain1.gain.linearRampToValueAtTime(0.45, now + 0.015);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+
+        osc1.start(now);
+        osc1.stop(now + 0.13);
+
+        // 2음: '롱' (맑고 높은 피치 차임 릴리즈)
+        let osc2 = ctx.createOscillator();
+        let gain2 = ctx.createGain();
+
+        let startTime2 = now + 0.055;
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(980, startTime2);
+        osc2.frequency.exponentialRampToValueAtTime(1470, startTime2 + 0.09);
+
+        gain2.gain.setValueAtTime(0.001, startTime2);
+        gain2.gain.linearRampToValueAtTime(0.50, startTime2 + 0.015);
+        gain2.gain.exponentialRampToValueAtTime(0.001, startTime2 + 0.22);
+
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+
+        osc2.start(startTime2);
+        osc2.stop(startTime2 + 0.24);
+
+    } catch (err) {
+        console.error("playBbyorongSound error:", err);
+    }
+}
+
 function updateHandWhooshEffect() {
     if (currentAppState !== APP_STATE.SECOND_SCREEN) return;
     if (!trackedHands || trackedHands.length === 0) {
@@ -2207,9 +2257,9 @@ function initializeHandTracking() {
                 let avgDist = distSum / 4;
                 let isFist = avgDist < FIST_THRESHOLD;
 
-                // 손을 쥐며 커서가 핑크색으로 변하는 순간 효과음 재생!
+                // 손을 쥐며 커서가 핑크색으로 변하는 순간 '뾰롱' 효과음 재생!
                 if (isFist && !prevHandFistStates[i]) {
-                    playSound(sndBubbleSpawn, 3.0);
+                    playBbyorongSound();
                 }
                 prevHandFistStates[i] = isFist;
 
@@ -2289,7 +2339,7 @@ function checkBubbleCollision() {
             bubble.squeezeStartTime = millis();
             bubble.squeezeDuration = 2000; // 2초 동안 말랑말랑 애니메이션
             bubble.hadOpenHandInside = false; // 리셋
-            playSound(sndBubbleSpawn, 3.0); // 잡혀서 핑크색으로 변할 때 버블 생성 효과음 재생
+            playBbyorongSound(); // 버블을 잡아서 핑크색으로 반응할 때 '뾰롱' 효과음 재생
         } else if (isAnyHandInside) {
             // 물방울 안에 손이 존재하고, 그 중 편 손이 하나라도 있다면 hadOpenHandInside 활성화
             if (isAnyOpenHandInside) {

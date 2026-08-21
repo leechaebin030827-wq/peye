@@ -2272,6 +2272,7 @@ function checkBubbleCollision() {
             bubble.squeezeStartTime = millis();
             bubble.squeezeDuration = 2000; // 2초 동안 말랑말랑 애니메이션
             bubble.hadOpenHandInside = false; // 리셋
+            playSound(sndBubbleSpawn, 3.0); // 잡혀서 핑크색으로 변할 때 버블 생성 효과음 재생
         } else if (isAnyHandInside) {
             // 물방울 안에 손이 존재하고, 그 중 편 손이 하나라도 있다면 hadOpenHandInside 활성화
             if (isAnyOpenHandInside) {

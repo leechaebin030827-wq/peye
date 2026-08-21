@@ -94,7 +94,7 @@ function initSounds() {
     // --- [효과음 및 배경음 볼륨 조절 설정 (0.0 ~ 1.0)] ---
     sndBubbleSpawn.volume = 1.0;
     sndDischargeSuction.volume = 0.5; // 배출 소리 원래대로 복구 (0.5)
-    sndBubbleEnterInlet.volume = 0.5;
+    sndBubbleEnterInlet.volume = 1.0;
     sndBubbleSuction.volume = 0.5;
     sndSuctionDeviceAppear.volume = 0.5;
     sndUsable.volume = 0.5;
@@ -869,7 +869,9 @@ function getNextBubbleFromPool() {
         return null;
     }
     const item = bubblePool.pop();
-    playSound(sndBubbleEnterInlet);
+    // 스페이스바 클릭 즉시 버블 등장 '띠링' 소리 및 주입 효과음 3배 증폭 재생
+    playSound(sndBubbleSpawn, 3.0);
+    playSound(sndBubbleEnterInlet, 3.0);
     return {
         text: item.text,
         type: item.type,
